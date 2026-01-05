@@ -1,108 +1,126 @@
-# 🏥 ClinicaSys - Sistema de Gestão para Clínicas
+# 🏥 ClinicaSys
 
-Sistema web moderno para gestão de clínicas, desenvolvido com **Next.js 14**, focado em segurança e controle de acesso. O sistema conta com um fluxo de cadastro com aprovação administrativa via e-mail e painéis exclusivos por nível de acesso.
+![Status](https://img.shields.io/badge/STATUS-EM_DESENVOLVIMENTO-yellow?style=for-the-badge)
+![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)
+![Prisma](https://img.shields.io/badge/Prisma-ORM-2d3748?style=for-the-badge&logo=prisma)
+![Tailwind](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=for-the-badge&logo=tailwind-css)
 
-## 🚀 Tecnologias Utilizadas
+> Sistema web moderno para gestão de clínicas, focado em segurança, controle de acesso e fluxo de aprovação administrativa.
 
-- **Frontend:** Next.js (App Router), React, Tailwind CSS, Lucide Icons.
-- **Backend:** Next.js API Routes (Serverless).
-- **Banco de Dados:** PostgreSQL (Hospedado no Render).
-- **ORM:** Prisma (v5).
-- **Segurança:** Senhas criptografadas (Bcrypt) e Sessão local.
-- **E-mail:** Nodemailer (Integração com Gmail).
-- **Validação:** Zod & React Hook Form.
+---
+
+## 🚀 Sobre o Projeto
+
+O **ClinicaSys** foi desenvolvido para resolver o problema de gestão de acessos em ambientes clínicos. Diferente de sistemas comuns, ele implementa um fluxo de **"Solicitação de Acesso"**, onde o usuário se cadastra, mas só acessa o sistema após aprovação e geração de credenciais pelo administrador via e-mail.
+
+### 🛠️ Tecnologias
+
+* **Frontend:** Next.js (App Router), React, Tailwind CSS, Lucide Icons.
+* **Backend:** Next.js API Routes (Serverless).
+* **Banco de Dados:** PostgreSQL (Hospedado no Render).
+* **ORM:** Prisma (v5).
+* **Autenticação:** Senhas criptografadas (Bcrypt) + Sessão Local.
+* **E-mail:** Nodemailer (Gmail SMTP).
+* **Validação:** Zod + React Hook Form.
 
 ---
 
 ## ⚙️ Pré-requisitos
 
-Antes de começar, você precisa ter instalado:
-- [Node.js](https://nodejs.org/) (Versão 18 ou superior)
-- [Git](https://git-scm.com/)
+Antes de começar, garanta que você possui instalado em sua máquina:
+* [Node.js](https://nodejs.org/) (Versão 18 ou superior)
+* [Git](https://git-scm.com/)
 
 ---
 
 ## 🔧 Instalação e Configuração
 
+Siga o passo a passo abaixo para rodar o projeto localmente:
+
 ### 1. Clonar o repositório
 ```bash
 git clone [https://github.com/SiteWebClinica/SiteClinica.git](https://github.com/SiteWebClinica/SiteClinica.git)
 cd SiteClinica
+```
 
-### 2. Instalar dependências
-Bash
-
+### 2. Instalar as dependências
+```bash
 npm install
+```
 
-### 3. Configurar Variáveis de Ambiente
-Crie um arquivo .env na raiz do projeto (ele não é enviado para o GitHub por segurança). Adicione as seguintes chaves:
+### 3. Configuração de Variáveis de Ambiente (.env)
+Crie um arquivo chamado `.env` na raiz do projeto (este arquivo não é versionado por segurança).
+Copie e cole as chaves abaixo, preenchendo com seus dados:
 
-Snippet de código
-
-# URL do Banco de Dados (Exemplo Render/PostgreSQL)
-# Adicione ?sslmode=require no final para conexões seguras no Render
+```env
+# --- BANCO DE DADOS (PostgreSQL) ---
+# Adicione ?sslmode=require ao final para conexões seguras (Render/Neon)
 DATABASE_URL="postgresql://usuario:senha@host/banco?sslmode=require"
 
-# Configurações de E-mail (Para envio de senhas e alertas ao Admin)
-# Utilize uma "Senha de App" do Google, não sua senha pessoal.
+# --- EMAIL (Gmail SMTP) ---
+# Utilize uma "Senha de App" do Google, não sua senha pessoal de login.
 EMAIL_USER="seu.email@gmail.com"
-EMAIL_PASS="sua-senha-de-app-gerada"
+EMAIL_PASS="sua-senha-de-app-aqui"
+```
 
 ### 4. Configurar o Banco de Dados
-Sincronize o esquema do projeto com o seu banco de dados:
+Sincronize o esquema do projeto (Prisma) com o seu banco de dados na nuvem:
 
-Bash
-
-# Gera os arquivos de tipagem do Prisma
+```bash
+# Gera os arquivos de tipagem do TypeScript
 npx prisma generate
 
-# Envia a estrutura das tabelas para o banco
+# Envia a estrutura das tabelas para o banco de dados
 npx prisma db push
-▶️ Rodando o Projeto
+```
+
+---
+
+## ▶️ Rodando a Aplicação
+
 Para iniciar o servidor de desenvolvimento:
 
-Bash
-
+```bash
 npm run dev
-O sistema estará acessível em: http://localhost:3000
+```
 
-🛠️ Funcionalidades e Fluxo de Uso
-1. Cadastro de Usuário (Paciente/Funcionário)
-O usuário acessa /cadastro.
+📍 O sistema estará acessível em: **http://localhost:3000**
 
-Preenche Nome e E-mail.
+---
 
-O sistema cria o registro como PENDING (Pendente).
+## 🗺️ Fluxo de Uso (Funcionalidades)
 
-Alerta: O Administrador recebe um e-mail avisando da nova solicitação.
+### 1️⃣ Cadastro (Solicitação de Acesso)
+1.  O usuário acessa a rota `/cadastro`.
+2.  Preenche **Nome Completo** e **E-mail Corporativo**.
+3.  O sistema cria o registro com status `PENDING` (Pendente).
+4.  🔔 **Alerta:** O Administrador recebe um e-mail imediato avisando da nova solicitação.
 
-2. Aprovação (Painel Administrativo)
-O Admin acessa /usuarios (ou clica no atalho no Dashboard).
+### 2️⃣ Aprovação (Painel Administrativo)
+1.  O Admin acessa `/usuarios` (ou usa o atalho no Dashboard).
+2.  Visualiza a lista de usuários pendentes.
+3.  Clica em **Aprovar** e define uma **Senha Temporária**.
+4.  📧 **Ação:** O sistema ativa o usuário (`ACTIVE`), criptografa a senha e envia um e-mail de boas-vindas para o usuário contendo as credenciais.
 
-Visualiza a lista de solicitações pendentes.
+### 3️⃣ Acesso e Dashboard
+* **Login:** O sistema valida e-mail, senha e se o status é `ACTIVE`.
+* **Dashboard Admin:** Visualiza cartões de gestão e o alerta vermelho "Aprovar Usuários".
+* **Dashboard Paciente:** Visualiza apenas seus dados pessoais e opções de segurança (Troca de senha).
 
-Clica em Aprovar e define uma senha temporária.
+---
 
-Ação: O sistema ativa o usuário (ACTIVE), criptografa a senha e envia um e-mail para o usuário com os dados de acesso.
+## 🗄️ Utilitários do Banco de Dados
 
-3. Login e Dashboard
-O usuário acessa /login.
+### Prisma Studio
+Para visualizar, editar e deletar registros do banco de dados através de uma interface gráfica no navegador:
 
-O sistema valida e-mail, senha e se o status é ACTIVE.
-
-Dashboard (/dashboard):
-
-Perfil ADMIN: Visualiza o card vermelho "Aprovar Usuários".
-
-Perfil USER: Visualiza apenas seus dados e opções de segurança.
-
-Possui botão de Logout e atalhos rápidos.
-
-🗄️ Comandos Úteis
-Visualizar o Banco de Dados (Prisma Studio)
-Para ver e editar dados diretamente pelo navegador:
-
-Bash
-
+```bash
 npx prisma studio
-Acesse em: http://localhost:5555
+```
+_A interface abrirá em: http://localhost:5555_
+
+---
+
+## 📝 Licença
+
+Este projeto foi desenvolvido para fins de estudo e gestão interna da **SiteWebClinica**.
