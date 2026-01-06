@@ -84,7 +84,12 @@ Para iniciar o servidor de desenvolvimento:
 npm run dev
 ```
 
-📍 O sistema estará acessível em: **http://localhost:3000**
+**Dica:** Para testar o acesso via celular na mesma rede Wi-Fi, rode o comando:
+```bash
+npm run dev -- -H 0.0.0.0
+```
+
+📍 O sistema estará acessível em: **http://localhost:3000** (ou no IP da sua máquina).
 
 ---
 
@@ -100,12 +105,18 @@ npm run dev
 1.  O Admin acessa `/usuarios` (ou usa o atalho no Dashboard).
 2.  Visualiza a lista de usuários pendentes.
 3.  Clica em **Aprovar** e define uma **Senha Temporária**.
-4.  📧 **Ação:** O sistema ativa o usuário (`ACTIVE`), criptografa a senha e envia um e-mail de boas-vindas para o usuário contendo as credenciais.
+4.  📧 **Ação:** O sistema ativa o usuário (`ACTIVE`), criptografa a senha e envia um e-mail com as credenciais.
 
-### 3️⃣ Acesso e Dashboard
-* **Login:** O sistema valida e-mail, senha e se o status é `ACTIVE`.
-* **Dashboard Admin:** Visualiza cartões de gestão e o alerta vermelho "Aprovar Usuários".
-* **Dashboard Paciente:** Visualiza apenas seus dados pessoais e opções de segurança (Troca de senha).
+### 3️⃣ Login e Primeiro Acesso (Segurança)
+* **Login:** O sistema valida credenciais e se o status é `ACTIVE`.
+* **Primeiro Acesso:** Se o usuário estiver usando a senha temporária, o sistema detecta e redireciona obrigatoriamente para a tela de **Troca de Senha**.
+* **Dashboard:** Após definir a senha pessoal, o usuário acessa o painel correspondente ao seu nível (Admin ou User).
+
+### 4️⃣ Recuperação de Senha
+1.  Usuário clica em "Esqueci a senha".
+2.  Informa o e-mail cadastrado.
+3.  🛡️ **Segurança:** O sistema verifica se o cadastro já foi aprovado. Se ainda for `PENDING`, o envio do link é bloqueado.
+4.  Se aprovado, recebe um link por e-mail (válido por 1 hora) para redefinir a senha.
 
 ---
 
