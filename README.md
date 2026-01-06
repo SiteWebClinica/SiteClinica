@@ -5,23 +5,35 @@
 ![Prisma](https://img.shields.io/badge/Prisma-ORM-2d3748?style=for-the-badge&logo=prisma)
 ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=for-the-badge&logo=tailwind-css)
 
-> Sistema web moderno para gestão de clínicas, focado em segurança, controle de acesso e fluxo de aprovação administrativa.
+> Sistema web moderno para gestão de clínicas, com interface "Clean Tech", agenda interativa e controle de acesso seguro.
 
 ---
 
 ## 🚀 Sobre o Projeto
 
-O **ClinicaSys** foi desenvolvido para resolver o problema de gestão de acessos em ambientes clínicos. Diferente de sistemas comuns, ele implementa um fluxo de **"Solicitação de Acesso"**, onde o usuário se cadastra, mas só acessa o sistema após aprovação e geração de credenciais pelo administrador via e-mail.
+O **ClinicaSys** é um sistema robusto focado na experiência do usuário (UX/UI) e segurança. Além do fluxo rigoroso de aprovação de contas, a versão atual conta com um **Dashboard Profissional** e uma identidade visual moderna projetada para transmitir limpeza e tecnologia.
+
+### ✨ Novas Funcionalidades (v2.0)
+
+* **🎨 Interface Clean Tech:** Design moderno com fundo animado ("Aurora Background") e elementos visuais focados em clareza.
+* **📅 Agenda Inteligente:** Calendário interativo completo (baseado em `date-fns`) com navegação entre meses e visualização rápida de eventos.
+* **📊 Dashboard Dinâmico:**
+    * Resumo financeiro colorido e ações rápidas.
+    * **Modal de Agenda:** Visualize a agenda completa sem sair da tela inicial.
+    * **Saudação Personalizada:** Identifica o usuário logado (ex: "Olá, João!") e seu cargo automaticamente.
+* **🔐 Layout Administrativo:** Estrutura de "App Shell" com Menu Lateral (Sidebar) e Topo (Header) fixos.
+
+---
 
 ### 🛠️ Tecnologias
 
-* **Frontend:** Next.js (App Router), React, Tailwind CSS, Lucide Icons.
+* **Frontend:** Next.js (App Router), React, Tailwind CSS.
+* **UI/UX:** Lucide Icons, Animações CSS (Blobs), Gradientes Mesh.
+* **Utils:** `date-fns` (Manipulação de datas), `clsx` (Classes condicionais).
 * **Backend:** Next.js API Routes (Serverless).
 * **Banco de Dados:** PostgreSQL (Hospedado no Render).
 * **ORM:** Prisma (v5).
-* **Autenticação:** Senhas criptografadas (Bcrypt) + Sessão Local.
-* **E-mail:** Nodemailer (Gmail SMTP).
-* **Validação:** Zod + React Hook Form.
+* **Autenticação:** Senhas criptografadas (Bcrypt) + Sessão Local + Controle de Primeiro Acesso.
 
 ---
 
@@ -39,7 +51,7 @@ Siga o passo a passo abaixo para rodar o projeto localmente:
 
 ### 1. Clonar o repositório
 ```bash
-git clone [https://github.com/SiteWebClinica/SiteClinica.git](https://github.com/SiteWebClinica/SiteClinica.git)
+git clone https://github.com/SiteWebClinica/SiteClinica.git
 cd SiteClinica
 ```
 
@@ -49,7 +61,7 @@ npm install
 ```
 
 ### 3. Configuração de Variáveis de Ambiente (.env)
-Crie um arquivo chamado `.env` na raiz do projeto (este arquivo não é versionado por segurança).
+Crie um arquivo chamado `.env` na raiz do projeto.
 Copie e cole as chaves abaixo, preenchendo com seus dados:
 
 ```env
@@ -58,7 +70,7 @@ Copie e cole as chaves abaixo, preenchendo com seus dados:
 DATABASE_URL="postgresql://usuario:senha@host/banco?sslmode=require"
 
 # --- EMAIL (Gmail SMTP) ---
-# Utilize uma "Senha de App" do Google, não sua senha pessoal de login.
+# Utilize uma "Senha de App" do Google.
 EMAIL_USER="seu.email@gmail.com"
 EMAIL_PASS="sua-senha-de-app-aqui"
 ```
@@ -93,37 +105,36 @@ npm run dev -- -H 0.0.0.0
 
 ---
 
-## 🗺️ Fluxo de Uso (Funcionalidades)
+## 🗺️ Guia de Telas
 
-### 1️⃣ Cadastro (Solicitação de Acesso)
-1.  O usuário acessa a rota `/cadastro`.
-2.  Preenche **Nome Completo** e **E-mail Corporativo**.
-3.  O sistema cria o registro com status `PENDING` (Pendente).
-4.  🔔 **Alerta:** O Administrador recebe um e-mail imediato avisando da nova solicitação.
+### 🔐 Autenticação e Segurança
+* **/login:** Acesso ao sistema. Verifica credenciais e redireciona para troca de senha se for o primeiro acesso.
+* **/cadastro:** Solicitação de acesso (cria usuário com status `PENDING`).
+* **/recuperar:** Fluxo seguro de "Esqueci minha senha" via e-mail (bloqueia usuários pendentes).
 
-### 2️⃣ Aprovação (Painel Administrativo)
-1.  O Admin acessa `/usuarios` (ou usa o atalho no Dashboard).
-2.  Visualiza a lista de usuários pendentes.
-3.  Clica em **Aprovar** e define uma **Senha Temporária**.
-4.  📧 **Ação:** O sistema ativa o usuário (`ACTIVE`), criptografa a senha e envia um e-mail com as credenciais.
-
-### 3️⃣ Login e Primeiro Acesso (Segurança)
-* **Login:** O sistema valida credenciais e se o status é `ACTIVE`.
-* **Primeiro Acesso:** Se o usuário estiver usando a senha temporária, o sistema detecta e redireciona obrigatoriamente para a tela de **Troca de Senha**.
-* **Dashboard:** Após definir a senha pessoal, o usuário acessa o painel correspondente ao seu nível (Admin ou User).
-
-### 4️⃣ Recuperação de Senha
-1.  Usuário clica em "Esqueci a senha".
-2.  Informa o e-mail cadastrado.
-3.  🛡️ **Segurança:** O sistema verifica se o cadastro já foi aprovado. Se ainda for `PENDING`, o envio do link é bloqueado.
-4.  Se aprovado, recebe um link por e-mail (válido por 1 hora) para redefinir a senha.
+### 🖥️ Painel Administrativo (Área Logada)
+* **/dashboard:** Visão geral da clínica.
+    * *Header:* Busca global, notificações e perfil do usuário (com opção de Logout).
+    * *Financeiro:* Cards de Contas a Receber (Verde), A Pagar (Vermelho) e Vencidos (Amarelo).
+    * *Widgets:* Agenda do dia e Aniversariantes.
+* **/agenda:** Calendário full-screen para gestão completa de consultas e exames.
 
 ---
 
-## 🗄️ Utilitários do Banco de Dados
+## 🎨 Identidade Visual (Paleta)
+
+O sistema utiliza uma combinação de cores psicológicas para aliar saúde e tecnologia:
+
+* **Teal (Ciano/Verde-Água):** Representa saúde, higiene e tranquilidade.
+* **Indigo (Roxo-Azulado):** Representa tecnologia, profundidade e confiança.
+* **Slate (Cinza-Azulado):** Usado em textos e fundos para reduzir o cansaço visual.
+
+---
+
+## 🗄️ Utilitários
 
 ### Prisma Studio
-Para visualizar, editar e deletar registros do banco de dados através de uma interface gráfica no navegador:
+Para visualizar o banco de dados via interface gráfica:
 
 ```bash
 npx prisma studio
