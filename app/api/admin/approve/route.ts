@@ -32,6 +32,7 @@ export async function POST(request: Request) {
       data: {
         password: hashedPassword,
         status: "ACTIVE",
+        mustChangePassword: true, // <--- ADICIONE ISSO (Obriga a trocar senha)
       },
     });
 
@@ -46,21 +47,33 @@ export async function POST(request: Request) {
 
     // 4. Dispara o E-mail Real
     await transporter.sendMail({
-      from: `"Sistema Clínica" <${process.env.EMAIL_USER}>`, // De quem
-      to: user.email, // Para quem (pegamos do banco)
+      from: `"Sistema Clínica" <${process.env.EMAIL_USER}>`,
+      to: user.email,
       subject: "Acesso Aprovado - ClinicaSys",
       html: `
-        <div style="font-family: Arial, sans-serif; color: #333;">
-          <h2>Olá, ${user.name}!</h2>
+        <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #0070f3;">Olá, ${user.name}!</h2>
           <p>Seu cadastro foi aprovado pelo administrador.</p>
-          <hr />
+          <hr style="border: 1px solid #eee;" />
+          
           <p><strong>Seus dados de acesso:</strong></p>
-          <p>E-mail: ${user.email}</p>
-          <p>Senha Temporária: <strong style="font-size: 16px; background: #eee; padding: 4px 8px; border-radius: 4px;">${newPassword}</strong></p>
-          <hr />
+          <p>E-mail: <strong>${user.email}</strong></p>
+          <p>Senha Temporária: <strong style="background: #eee; padding: 4px 8px; border-radius: 4px;">${newPassword}</strong></p>
+          
+          <hr style="border: 1px solid #eee;" />
           <p style="font-size: 12px; color: #666;">Por segurança, troque sua senha no primeiro acesso.</p>
           <br/>
-          <a href="http://localhost:3000/login" style="background: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Acessar Sistema</a>
+
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="http://192.168.1.8:3000/login" target="_blank" style="background: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+              Acessar Sistema
+            </a>
+          </div>
+
+          <p style="font-size: 12px; color: #888; text-align: center;">
+            Se o botão não funcionar, copie e cole o link abaixo no navegador:<br/>
+            <a href="http://192.168.1.8:3000/login" style="color: #0070f3;">http://192.168.1.8:3000/login</a>
+          </p>
         </div>
       `,
     });

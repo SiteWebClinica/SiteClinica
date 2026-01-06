@@ -49,30 +49,40 @@ export async function POST(request: Request) {
 
     // 4. Manda o ALERTA para VOCÊ (Admin)
     try {
+      // Defina seu IP aqui para facilitar (se mudar, troca só aqui)
+      const baseUrl = "http://192.168.1.8:3000"; 
+
       await transporter.sendMail({
         from: `"Sistema Clínica" <${process.env.EMAIL_USER}>`,
-        to: "siteclinicaweb@gmail.com", // <--- O E-mail que vai receber o aviso
+        to: "siteclinicaweb@gmail.com", // Seu email de admin
         subject: "🔔 Nova Solicitação de Cadastro",
         html: `
-          <div style="font-family: Arial, sans-serif; color: #333;">
+          <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
             <h2>Novo usuário aguardando aprovação!</h2>
             <p>Um novo usuário solicitou acesso ao sistema:</p>
-            <ul>
+            <ul style="background: #f9f9f9; padding: 15px; border-radius: 5px;">
               <li><strong>Nome:</strong> ${name}</li>
               <li><strong>E-mail:</strong> ${email}</li>
               <li><strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}</li>
             </ul>
             <br/>
-            <a href="http://localhost:3000/usuarios" style="background: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-              Ir para Aprovação
-            </a>
+            
+            <div style="text-align: center; margin: 20px 0;">
+              <a href="${baseUrl}/usuarios" target="_blank" style="background: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                Ir para Aprovação
+              </a>
+            </div>
+
+            <p style="font-size: 12px; color: #888; text-align: center;">
+              Se o botão não funcionar, clique ou copie o link abaixo:<br/>
+              <a href="${baseUrl}/usuarios" style="color: #0070f3;">${baseUrl}/usuarios</a>
+            </p>
           </div>
         `,
       });
       console.log("✅ Aviso enviado para o Admin!");
     } catch (mailError) {
       console.error("Erro ao enviar aviso para admin:", mailError);
-      // Não vamos travar o cadastro se o e-mail falhar, apenas logar o erro
     }
 
     return NextResponse.json({

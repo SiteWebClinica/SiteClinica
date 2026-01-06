@@ -8,12 +8,17 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  name      String
+  id        String   @id @default(cuid())
   email     String   @unique
+  name      String
   password  String
-  role      String   @default("USER") // ADMIN, MEDICO, RECEPCAO
-  status    String   @default("PENDING") // <-- NOVO CAMPO: PENDING ou ACTIVE
+  role      String   @default("USER")
+  status    String   @default("PENDING")
+  mustChangePassword Boolean @default(false) 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // NOVOS CAMPOS PARA RECUPERAÇÃO DE SENHA:
+  resetToken       String?   @unique
+  resetTokenExpiry DateTime?
 }
