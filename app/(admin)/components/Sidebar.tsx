@@ -1,85 +1,130 @@
-import Link from "next/link";
-import {
-  Calendar,
-  ChevronDown,
-  CircleHelp,
-  ClipboardList,
-  FileText,
-  Home,
-  LayoutDashboard,
-  Package,
-  Settings,
-  ShoppingBag,
-  Stethoscope,
-  Users,
-  DollarSign
-} from "lucide-react";
+"use client";
 
-export function Sidebar() {
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { 
+  LayoutDashboard, Calendar, Users, ShoppingBag, 
+  MessageCircle, DollarSign, Package, FileEdit, 
+  Building2, BarChart3, FileText, HelpCircle, 
+  ChevronDown, Settings, ShieldCheck, Activity // <--- Activity de volta
+} from "lucide-react"; 
+
+export default function Sidebar() {
+  const pathname = usePathname();
+  const [user, setUser] = useState<any>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Esconde no login
+  if (pathname === "/login" || pathname === "/cadastro") return null;
+
+  useEffect(() => {
+    setMounted(true);
+    const stored = localStorage.getItem("user");
+    if (stored) setUser(JSON.parse(stored));
+  }, []);
+
+  if (!mounted) return null;
+
+  const isActive = (path: string) => pathname === path;
+  
+  const linkClass = (path: string) => `
+    flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-lg transition-all mb-1
+    ${isActive(path) 
+      ? "text-teal-600 bg-teal-50" 
+      : "text-gray-600 hover:text-teal-600 hover:bg-gray-50"}
+  `;
+
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 z-20 flex flex-col overflow-y-auto">
-      {/* LOGO MUDOU DE COR */}
+    <aside className="w-64 bg-white h-screen border-r border-gray-200 flex flex-col fixed left-0 top-0 z-50 font-sans">
+      
+      {/* LOGO COM ÍCONE ACTIVITY (BATIMENTO) */}
       <div className="h-16 flex items-center px-6 border-b border-gray-100">
-        <div className="flex items-center gap-2 text-gray-800 font-bold text-xl">
-           {/* Ícone Teal */}
-           <Stethoscope size={28} className="text-teal-600" />
-           {/* Texto com acento Teal */}
-           <span>Clinica<span className="text-teal-600">Sys</span></span>
+        <div className="flex items-center gap-2 text-teal-600">
+           {/* O Ícone que você gostou */}
+           <Activity size={28} strokeWidth={2.5} /> 
+           <span className="text-xl font-bold tracking-tight text-gray-800">
+              Clinica <span className="text-teal-600">Sys</span>
+           </span>
         </div>
       </div>
 
-      <nav className="flex-1 py-6 px-3 space-y-1">
-        {/* Item Ativo agora é Teal */}
-        <NavItem icon={Home} label="Início" href="/dashboard" active />
-        <NavItem icon={Calendar} label="Agenda" href="/agenda" />
-        <NavItem icon={Users} label="Clientes" href="/clientes" />
-        <NavItem icon={ShoppingBag} label="Vendas e Orç." href="/vendas" />
+      {/* MENU DE NAVEGAÇÃO */}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto custom-scrollbar">
         
-        <NavGroup icon={Stethoscope} label="Atendimento" />
-        <NavGroup icon={DollarSign} label="Financeiro" />
-        <NavGroup icon={Package} label="Estoque" />
-        <NavGroup icon={ClipboardList} label="Cadastros" />
-        <NavGroup icon={Settings} label="Minha Clínica" />
-        <NavGroup icon={FileText} label="Relatórios" />
-        <NavItem icon={FileText} label="Fiscal" href="/fiscal" />
-      </nav>
-
-      <div className="p-4 border-t border-gray-100">
-        {/* Botão de Ajuda agora é Índigo (Roxo azulado) */}
-        <Link href="/ajuda" className="flex items-center gap-3 text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-colors font-medium">
-          <CircleHelp size={20} />
-          <span>Ajuda</span>
+        <Link href="/dashboard" className={linkClass("/dashboard")}>
+          <LayoutDashboard size={18} /> Início
         </Link>
-      </div>
+
+        <Link href="/agenda" className={linkClass("/agenda")}>
+          <Calendar size={18} /> Agenda
+        </Link>
+
+        <Link href="/pacientes" className={linkClass("/pacientes")}>
+          <Users size={18} /> Clientes
+        </Link>
+
+        <Link href="/vendas" className={linkClass("/vendas")}>
+          <ShoppingBag size={18} /> Vendas e Orçamentos
+        </Link>
+
+        {/* Itens Visuais (Dropdown fake) */}
+        <div className={linkClass("#") + " justify-between cursor-pointer"}>
+          <div className="flex items-center gap-3"><MessageCircle size={18} /> Atendimento</div>
+          <ChevronDown size={14} className="text-gray-400" />
+        </div>
+
+        <Link href="/financeiro" className={linkClass("/financeiro")}>
+          <div className="flex items-center gap-3"><DollarSign size={18} /> Financeiro</div>
+        </Link>
+
+        <div className={linkClass("#") + " justify-between cursor-pointer"}>
+          <div className="flex items-center gap-3"><Package size={18} /> Estoque</div>
+          <ChevronDown size={14} className="text-gray-400" />
+        </div>
+
+        <div className={linkClass("#") + " justify-between cursor-pointer"}>
+          <div className="flex items-center gap-3"><FileEdit size={18} /> Cadastros</div>
+          <ChevronDown size={14} className="text-gray-400" />
+        </div>
+
+        <div className={linkClass("#") + " justify-between cursor-pointer"}>
+          <div className="flex items-center gap-3"><Building2 size={18} /> Minha Clínica</div>
+          <ChevronDown size={14} className="text-gray-400" />
+        </div>
+
+        <div className={linkClass("#") + " justify-between cursor-pointer"}>
+          <div className="flex items-center gap-3"><BarChart3 size={18} /> Relatórios</div>
+          <ChevronDown size={14} className="text-gray-400" />
+        </div>
+
+        <Link href="/fiscal" className={linkClass("/fiscal")}>
+          <FileText size={18} /> Fiscal
+        </Link>
+
+        {/* ÁREA DO ADMIN (Só aparece para quem tem permissão) */}
+        {user?.permissions?.admin && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+             <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Administração</p>
+             
+             <Link href="/usuarios/pendentes" className={linkClass("/usuarios/pendentes")}>
+                <ShieldCheck size={18} /> Aprovações
+             </Link>
+
+             <Link href="/configuracoes" className={linkClass("/configuracoes")}>
+                <Settings size={18} /> Configurações
+             </Link>
+          </div>
+        )}
+
+        {/* Link de Ajuda */}
+        <div className="mt-2">
+            <Link href="/ajuda" className="flex items-center gap-3 px-4 py-2 text-sm font-medium text-pink-500 hover:bg-pink-50 rounded-lg">
+                <HelpCircle size={18} /> Ajuda
+            </Link>
+        </div>
+
+      </nav>
     </aside>
-  );
-}
-
-function NavItem({ icon: Icon, label, href = "#", active = false }: any) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-        active
-          // Cor de fundo e texto do item ativo mudaram para Teal
-          ? "bg-teal-50 text-teal-700"
-          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-      }`}
-    >
-      <Icon size={18} />
-      <span>{label}</span>
-    </Link>
-  );
-}
-
-function NavGroup({ icon: Icon, label }: any) {
-  return (
-    <button className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
-      <div className="flex items-center gap-3">
-        <Icon size={18} />
-        <span>{label}</span>
-      </div>
-      <ChevronDown size={14} className="text-gray-400" />
-    </button>
   );
 }

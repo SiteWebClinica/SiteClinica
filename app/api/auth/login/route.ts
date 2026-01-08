@@ -20,22 +20,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "E-mail ou senha incorretos." }, { status: 401 });
     }
 
-    // 2. SEGURANÇA: Verifica se o Admin já aprovou (Status ACTIVE)
-    if (user.status !== "ACTIVE") {
+    // 2. SEGURANÇA: Verifica se o Admin aprovou
+    // IMPORTANTE: No banco está "APPROVED", não "ACTIVE".
+    // Também verificamos a coluna 'active' (booleana) por garantia.
+    if (user.status !== "APPROVED" || !user.active) {
       return NextResponse.json(
-        { error: "Seu cadastro ainda está em análise. Aguarde o e-mail de aprovação." },
+        { error: "Seu cadastro ainda está em análise ou foi desativado." },
         { status: 403 }
       );
     }
 
-    // 3. Verifica a senha (compara o que foi digitado com o banco)
+    // 3. Verifica a senha
     const passwordMatch = await bcrypt.compare(password, user.password);
 
     if (!passwordMatch) {
       return NextResponse.json({ error: "E-mail ou senha incorretos." }, { status: 401 });
     }
 
-    // 4. Sucesso! Retorna os dados para o navegador
+    // 4. Sucesso! Retorna os dados
     return NextResponse.json({
       message: "Login realizado com sucesso!",
       user: {
@@ -43,8 +45,15 @@ export async function POST(request: Request) {
         name: user.name,
         email: user.email,
         role: user.role,
-        mustChangePassword: user.mustChangePassword // <--- AQUI ESTÁ O SEGREDO DO PRIMEIRO ACESSO
-      }
+        mustChangePassword: user.mustChangePassword,
+        
+        // --- O PULO DO GATO ---
+        // Precisamos devolver as permissões para o Menu Lateral funcionar!
+        permissions: user.permissions || {} 
+      },
+      // Se seu front usa token, mande um fake ou gere um JWT aqui. 
+      // Se não usa, pode deixar sem.
+      token: "token-de-sessao-valido" 
     });
 
   } catch (error) {

@@ -1,396 +1,405 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Calendar,
-  CreditCard,
-  DollarSign,
-  FileText,
-  TrendingDown,
-  TrendingUp,
-  UserPlus,
-  Users,
-  Clock,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  MapPin
-} from "lucide-react";
+import Link from "next/link";
 import { 
-  format, 
-  addMonths, 
-  subMonths, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfWeek, 
-  endOfWeek, 
-  eachDayOfInterval, 
-  isSameMonth, 
-  isSameDay, 
-  isToday 
-} from "date-fns";
-import { ptBR } from "date-fns/locale";
-import clsx from "clsx";
+  Calendar, Users, ShoppingBag, CreditCard, 
+  X, Save, UserPlus, Edit2, Plus, Clock, CheckCircle,
+  ChevronLeft, ChevronRight
+} from "lucide-react"; 
 
-// --- MOCK DE DADOS ---
-const MOCK_EVENTS = [
-  {
-    id: 1,
-    date: new Date(), // Hoje
-    title: "Roberto Silva",
-    type: "consultation", 
-    time: "14:30",
-  },
-  {
-    id: 2,
-    date: new Date(), // Hoje
-    title: "Ana Julia",
-    type: "exam",
-    time: "16:00",
-  },
-  {
-    id: 3,
-    date: new Date(new Date().setDate(new Date().getDate() + 2)), // Daqui a 2 dias
-    title: "Carlos Edu",
-    type: "consultation",
-    time: "09:00",
-  },
-  {
-    id: 4,
-    date: new Date(new Date().setDate(new Date().getDate() + 5)), // Daqui a 5 dias
-    title: "Mariana Souza",
-    type: "exam",
-    time: "11:15",
-  }
-];
+export default function Dashboard() {
+  const [user, setUser] = useState<any>({ name: "Usuario" });
+  
+  // --- CONTROLE DOS MODAIS ---
+  const [isModalOpen, setIsModalOpen] = useState(false);       // Modal Novo Agendamento
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false); // Modal Calendário Visual
+  const [isAuxModalOpen, setIsAuxModalOpen] = useState(false); // Modal NOVO PACIENTE (Vindo da Agenda)
 
-// --- COMPONENTES AUXILIARES ---
+  const [loading, setLoading] = useState(false);
 
-function QuickActionButton({ icon: Icon, label, colorClass }: any) {
-  return (
-    <button
-      className={`${colorClass} text-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center gap-3 font-medium`}
-    >
-      <Icon size={24} />
-      <span>{label}</span>
-    </button>
-  );
-}
-
-function FinancialCard({ title, value, subtitle, icon: Icon, theme }: any) {
-  const themes: any = {
-    success: { bg: "bg-green-600", text: "text-white", iconBg: "bg-green-500/30" },
-    danger: { bg: "bg-red-600", text: "text-white", iconBg: "bg-red-500/30" },
-    warning: { bg: "bg-yellow-500", text: "text-white", iconBg: "bg-yellow-400/30" },
-    info: { bg: "bg-teal-600", text: "text-white", iconBg: "bg-teal-500/30" },
-  };
-  const t = themes[theme] || themes.info;
-
-  return (
-    <div className={`${t.bg} ${t.text} p-6 rounded-2xl shadow-sm relative overflow-hidden`}>
-      <Icon size={100} className="absolute -right-6 -bottom-6 opacity-20" />
-      <div className="relative z-10">
-        <h3 className="font-medium text-lg opacity-90 flex items-center gap-2">
-          <Icon size={20} /> {title}
-        </h3>
-        <p className="text-3xl font-bold mt-4">{value}</p>
-        <p className="text-sm opacity-80 mt-1">{subtitle}</p>
-      </div>
-      <button className={`mt-6 w-full py-2 rounded-lg ${t.iconBg} hover:bg-white/20 transition text-sm font-semibold`}>
-        Abrir Detalhes
-      </button>
-    </div>
-  );
-}
-
-function SideWidget({ title, icon: Icon, children }: any) {
-  return (
-    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full">
-      <h3 className="text-gray-800 font-semibold mb-4 flex items-center gap-2">
-        <Icon className="text-teal-600" size={20} /> {title}
-      </h3>
-      <div className="flex-1">{children}</div>
-    </div>
-  );
-}
-
-// --- MODAL DE CALENDÁRIO INTERATIVO ---
-function CalendarModal({ isOpen, onClose }: any) {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date()); // Data clicada
-
-  // Reseta para hoje ao abrir
-  useEffect(() => {
-    if (isOpen) {
-      const today = new Date();
-      setCurrentDate(today);
-      setSelectedDate(today);
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
-  const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
-
-  const monthStart = startOfMonth(currentDate);
-  const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(endOfMonth(monthStart));
-  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
-  const weekDays = ["D", "S", "T", "Q", "Q", "S", "S"];
-
-  // Filtra eventos do dia selecionado (para mostrar na lista abaixo)
-  const selectedEvents = MOCK_EVENTS.filter(evt => isSameDay(evt.date, selectedDate));
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-        
-        {/* Header */}
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-teal-50">
-          <h2 className="text-lg font-bold text-teal-800 flex items-center gap-2">
-             <Calendar size={20}/> Agenda Completa
-          </h2>
-          <button onClick={onClose} className="p-1 hover:bg-teal-100 rounded-full text-teal-700 transition-colors">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-6">
-            
-            {/* Navegação Mês */}
-            <div className="flex items-center justify-between mb-6">
-              <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-full text-gray-600">
-                  <ChevronLeft size={20} />
-              </button>
-              <span className="text-lg font-semibold text-gray-800 capitalize">
-                  {format(currentDate, "MMMM yyyy", { locale: ptBR })}
-              </span>
-              <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-full text-gray-600">
-                  <ChevronRight size={20} />
-              </button>
-            </div>
-
-            {/* Calendário Grid */}
-            <div className="bg-white rounded-xl border border-gray-100 p-2 shadow-sm mb-6">
-              <div className="grid grid-cols-7 mb-2">
-                {weekDays.map((d, i) => (
-                  <div key={i} className="text-center text-xs font-bold text-gray-400 py-1">{d}</div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-7 gap-1">
-                {calendarDays.map((day) => {
-                  const hasEvents = MOCK_EVENTS.some(evt => isSameDay(evt.date, day));
-                  const isSelected = isSameDay(day, selectedDate);
-                  
-                  return (
-                    <button 
-                      key={day.toString()}
-                      onClick={() => setSelectedDate(day)}
-                      className={clsx(
-                        "h-10 flex flex-col items-center justify-center rounded-lg text-sm relative transition-all border-2 border-transparent",
-                        !isSameMonth(day, currentDate) ? "text-gray-300" : "text-gray-700 hover:bg-gray-50",
-                        
-                        // Estilo se for HOJE
-                        isToday(day) && !isSelected && "bg-teal-50 text-teal-700 font-bold",
-                        
-                        // Estilo se estiver SELECIONADO (clicado)
-                        isSelected && "bg-teal-600 text-white font-bold shadow-md transform scale-105 z-10",
-                        
-                        // Borda para indicar que tem evento (se não estiver selecionado)
-                        hasEvents && !isSelected && "border-indigo-100"
-                      )}
-                    >
-                      {format(day, "d")}
-                      
-                      {/* PONTO INDICADOR (Bolinha) */}
-                      {hasEvents && (
-                        <span className={clsx(
-                          "w-1.5 h-1.5 rounded-full absolute bottom-1.5",
-                          isSelected ? "bg-white" : "bg-indigo-500"
-                        )}></span>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Lista de Eventos do Dia Selecionado */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                 Agendamentos em {format(selectedDate, "dd/MM")}
-              </h3>
-              
-              <div className="space-y-2">
-                {selectedEvents.length > 0 ? (
-                  selectedEvents.map((evt) => (
-                    <div key={evt.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100 hover:bg-teal-50 hover:border-teal-200 transition-colors cursor-pointer group">
-                      <div className={clsx(
-                        "w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold",
-                        evt.type === 'consultation' ? "bg-indigo-100 text-indigo-700" : "bg-fuchsia-100 text-fuchsia-700"
-                      )}>
-                        {evt.time}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-800 text-sm">{evt.title}</p>
-                        <p className="text-xs text-gray-500 group-hover:text-teal-600">
-                          {evt.type === 'consultation' ? 'Consulta Médica' : 'Exame Clínico'}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                    <Clock className="mx-auto mb-2 opacity-20" size={24} />
-                    <p className="text-sm">Nenhum evento neste dia.</p>
-                    <button className="text-teal-600 text-xs font-bold mt-2 hover:underline">
-                      + Adicionar Novo
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// --- PÁGINA PRINCIPAL ---
-export default function DashboardPage() {
-  const [userName, setUserName] = useState("Doutor(a)");
-  const [showCalendar, setShowCalendar] = useState(false);
+  // --- ESTADO DO NOVO PACIENTE (Igual da Agenda) ---
+  const [newPatientData, setNewPatientData] = useState({
+    name: "", cpf: "", rg: "", healthPlan: "", bloodType: "", emergencyName: "", emergencyPhone: "",
+    phones: [""] as string[], emails: [""] as string[], addresses: [""] as string[], responsibles: [""] as string[]
+  });
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("clinica_user");
-    if (storedUser) {
-      const user = JSON.parse(storedUser);
-      const firstName = user.name.split(" ")[0];
-      setUserName(firstName);
-    }
+    const stored = localStorage.getItem("user");
+    if (stored) setUser(JSON.parse(stored));
   }, []);
 
-  const todayEvents = MOCK_EVENTS.filter(event => isToday(event.date));
+  // --- LÓGICA DO NOVO PACIENTE (Igual da Agenda) ---
+  const addField = (field: 'phones' | 'emails' | 'addresses' | 'responsibles') => { 
+      setNewPatientData(prev => ({ ...prev, [field]: [...prev[field], ""] })); 
+  };
+  
+  const updateField = (field: 'phones' | 'emails' | 'addresses' | 'responsibles', index: number, value: string) => {
+      const newList = [...newPatientData[field]]; 
+      newList[index] = value; 
+      setNewPatientData(prev => ({ ...prev, [field]: newList }));
+  };
+
+  function handleSavePatient() {
+      // Simula salvamento do paciente
+      if(!newPatientData.name) return alert("Nome é obrigatório!");
+      
+      alert(`Paciente ${newPatientData.name} cadastrado com sucesso!`);
+      
+      // Aqui você selecionaria o paciente no formulário automaticamente
+      setIsAuxModalOpen(false);
+      
+      // Limpa os dados
+      setNewPatientData({
+        name: "", cpf: "", rg: "", healthPlan: "", bloodType: "", emergencyName: "", emergencyPhone: "",
+        phones: [""], emails: [""], addresses: [""], responsibles: [""]
+      });
+  }
+
+  // --- LÓGICA DO AGENDAMENTO ---
+  function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setTimeout(() => {
+        setLoading(false);
+        setIsModalOpen(false);
+        alert("Agendamento salvo com sucesso!");
+    }, 1500);
+  }
+
+  function openNewAppointment() {
+      setIsCalendarOpen(false); 
+      setIsModalOpen(true);     
+  }
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-8">
+    <div className="space-y-6 relative">
       
-      <CalendarModal isOpen={showCalendar} onClose={() => setShowCalendar(false)} />
-
-      <header>
-        <h1 className="text-2xl font-bold text-gray-800">
-          Olá, {userName}! 👋
+      {/* 1. Título e Saudação */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          Olá, {user.name?.split(" ")[0]}! 👋
         </h1>
-        <p className="text-gray-500">Aqui está o resumo da sua clínica hoje.</p>
-      </header>
+        <p className="text-gray-500 text-sm mt-1">
+          Aqui está o resumo da sua clínica hoje.
+        </p>
+      </div>
 
-      {/* SESSÃO 1: AÇÕES RÁPIDAS */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <QuickActionButton icon={Calendar} label="Novo Agendamento" colorClass="bg-teal-600 hover:bg-teal-700" />
-        <QuickActionButton icon={UserPlus} label="Novo Paciente" colorClass="bg-indigo-600 hover:bg-indigo-700" />
-        <QuickActionButton icon={FileText} label="Nova Venda/Orç." colorClass="bg-purple-600 hover:bg-purple-700" />
-        <QuickActionButton icon={CreditCard} label="Conta a Pagar" colorClass="bg-fuchsia-700 hover:bg-fuchsia-800" />
-      </section>
+      {/* 2. Botões de Ação Rápida */}
+      <div>
+        <h2 className="text-sm font-bold text-gray-700 mb-3">Acesso Rápido</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <button 
+                onClick={() => setIsModalOpen(true)}
+                className="bg-teal-500 hover:bg-teal-600 text-white p-4 rounded-xl flex items-center justify-center gap-2 font-bold transition-all shadow-sm"
+            >
+                <Calendar size={20} /> Novo Agendamento
+            </button>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        
-        {/* COLUNA ESQUERDA (2/3) */}
-        <div className="xl:col-span-2 space-y-8">
-          <section>
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Saúde Financeira</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FinancialCard title="A Receber Hoje" value="R$ 1.250,00" subtitle="3 atendimentos previstos" icon={TrendingUp} theme="success" />
-              <FinancialCard title="A Pagar Hoje" value="R$ 450,00" subtitle="Contas de consumo" icon={TrendingDown} theme="danger" />
-              <FinancialCard title="Recebimentos Vencidos" value="R$ 890,00" subtitle="Cobrar pacientes" icon={DollarSign} theme="warning" />
-              <FinancialCard title="Pagamentos Vencidos" value="R$ 0,00" subtitle="Tudo em dia!" icon={CreditCard} theme="info" />
-            </div>
-          </section>
-
-          <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-800">Atendimentos Recentes</h2>
-              <button className="text-teal-600 text-sm hover:underline">Ver todos</button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left text-gray-600">
-                <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3">Paciente</th>
-                    <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3">Data</th>
-                    <th className="px-6 py-3 text-right">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="bg-white border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 font-medium text-gray-900 flex items-center gap-2">
-                      <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center text-teal-600"><Users size={16}/></div>
-                      Roberto Silva
-                    </td>
-                    <td className="px-6 py-4"><span className="bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded">Concluído</span></td>
-                    <td className="px-6 py-4">Hoje, 14:30</td>
-                    <td className="px-6 py-4 text-right font-medium">R$ 250,00</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-
-        {/* COLUNA DIREITA (1/3) */}
-        <div className="space-y-8">
-          
-          <SideWidget title="Agenda de Hoje" icon={Calendar}>
-            {todayEvents.length > 0 ? (
-              <div className="space-y-4">
-                {todayEvents.map((evt) => (
-                  <div key={evt.id} className="flex items-start gap-3 pb-3 border-b border-gray-50 last:border-0 last:pb-0">
-                    <div className="flex flex-col items-center min-w-[3rem]">
-                      <span className="text-sm font-bold text-gray-800">{evt.time}</span>
-                      <div className={`w-1.5 h-1.5 rounded-full mt-1 ${evt.type === 'consultation' ? 'bg-indigo-400' : 'bg-fuchsia-400'}`}></div>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-700 leading-tight">{evt.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5 capitalize">
-                        {evt.type === 'consultation' ? 'Consulta' : 'Exame'} • Particular
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                
-                <button 
-                  onClick={() => setShowCalendar(true)}
-                  className="w-full mt-2 py-2 text-xs font-medium text-teal-600 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors"
-                >
-                  Ver Agenda Completa
-                </button>
-              </div>
-            ) : (
-              <div className="text-center py-6 text-gray-400">
-                <Clock className="mx-auto mb-2 opacity-30" size={32} />
-                <p className="text-sm">Tudo livre por hoje!</p>
-                <button 
-                  onClick={() => setShowCalendar(true)}
-                  className="mt-4 text-teal-600 text-sm font-medium hover:underline"
-                >
-                    Ver Calendário
-                </button>
-              </div>
-            )}
-          </SideWidget>
-
-          <SideWidget title="Aniversariantes" icon={Users}>
-            <div className="bg-indigo-50 text-indigo-800 p-4 rounded-lg text-center text-sm font-medium">
-              🎉 Nenhum aniversariante hoje.
-            </div>
-          </SideWidget>
+            <Link href="/pacientes/novo" className="bg-pink-500 hover:bg-pink-600 text-white p-4 rounded-xl flex items-center justify-center gap-2 font-bold transition-all shadow-sm">
+                <Users size={20} /> Novo Cliente
+            </Link>
+            <Link href="/vendas/nova" className="bg-cyan-500 hover:bg-cyan-600 text-white p-4 rounded-xl flex items-center justify-center gap-2 font-bold transition-all shadow-sm">
+                <ShoppingBag size={20} /> Nova Venda
+            </Link>
+            <Link href="/financeiro/pagar" className="bg-purple-500 hover:bg-purple-600 text-white p-4 rounded-xl flex items-center justify-center gap-2 font-bold transition-all shadow-sm">
+                <CreditCard size={20} /> Conta a Pagar
+            </Link>
         </div>
       </div>
+
+      {/* 3. Área Principal */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Lado Esquerdo: Financeiro */}
+        <div className="lg:col-span-2 space-y-6">
+            <h2 className="text-sm font-bold text-gray-700">Saúde Financeira</h2>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-green-500 text-white p-5 rounded-xl shadow-sm relative overflow-hidden group">
+                    <div className="relative z-10">
+                        <p className="text-green-100 text-sm">A receber hoje</p>
+                        <h3 className="text-2xl font-bold mt-1">R$ 0,00</h3>
+                    </div>
+                    <button className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 px-3 py-1 rounded text-xs font-bold backdrop-blur-sm transition-colors">Abrir</button>
+                    <CreditCard className="absolute -right-4 -bottom-4 text-green-600/30 w-24 h-24 rotate-12" />
+                </div>
+
+                <div className="bg-red-500 text-white p-5 rounded-xl shadow-sm relative overflow-hidden">
+                    <div className="relative z-10">
+                        <p className="text-red-100 text-sm">A pagar hoje</p>
+                        <h3 className="text-2xl font-bold mt-1">R$ 0,00</h3>
+                    </div>
+                    <button className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 px-3 py-1 rounded text-xs font-bold backdrop-blur-sm transition-colors">Abrir</button>
+                    <CreditCard className="absolute -right-4 -bottom-4 text-red-600/30 w-24 h-24 rotate-12" />
+                </div>
+
+                <div className="bg-white border border-green-200 text-green-600 p-5 rounded-xl shadow-sm relative">
+                    <p className="text-xs font-bold uppercase tracking-wider text-green-400">Recebimentos Vencidos</p>
+                    <h3 className="text-2xl font-bold mt-1">R$ 0,00</h3>
+                    <button className="absolute right-4 top-1/2 -translate-y-1/2 border border-green-200 hover:bg-green-50 px-3 py-1 rounded text-xs font-bold transition-colors">Abrir</button>
+                </div>
+
+                <div className="bg-white border border-red-200 text-red-600 p-5 rounded-xl shadow-sm relative">
+                    <p className="text-xs font-bold uppercase tracking-wider text-red-400">Pagamentos Vencidos</p>
+                    <h3 className="text-2xl font-bold mt-1">R$ 0,00</h3>
+                    <button className="absolute right-4 top-1/2 -translate-y-1/2 border border-red-200 hover:bg-red-50 px-3 py-1 rounded text-xs font-bold transition-colors">Abrir</button>
+                </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-gray-700 text-sm">Resumo do Mês</h3>
+                    <Calendar size={16} className="text-teal-500" />
+                </div>
+                
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="text-gray-400 border-b border-gray-100 text-left">
+                            <th className="pb-3 font-medium text-xs uppercase">Status</th>
+                            <th className="pb-3 font-medium text-xs uppercase text-right">A Receber</th>
+                            <th className="pb-3 font-medium text-xs uppercase text-right">A Pagar</th>
+                            <th className="pb-3 font-medium text-xs uppercase text-right">Saldo</th>
+                        </tr>
+                    </thead>
+                    <tbody className="text-gray-600">
+                        <tr className="border-b border-gray-50 last:border-0">
+                            <td className="py-3">Previsto</td>
+                            <td className="py-3 text-right text-green-600">7.000,00</td>
+                            <td className="py-3 text-right text-red-500">1.784,90</td>
+                            <td className="py-3 text-right font-bold text-blue-600">5.215,10</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {/* Lado Direito: Agenda */}
+        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm h-fit">
+            <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                <Calendar size={18} className="text-teal-600" /> Agenda de Hoje
+            </h3>
+            <div className="flex flex-col items-center justify-center py-10 text-center text-gray-400">
+                <div className="bg-gray-50 p-4 rounded-full mb-3">
+                    <Calendar size={24} />
+                </div>
+                <p className="text-sm">Nenhum agendamento para hoje.</p>
+            </div>
+            {/* Botão Ver Agenda */}
+            <button 
+                onClick={() => setIsCalendarOpen(true)}
+                className="w-full mt-4 bg-teal-50 text-teal-700 py-2 rounded-lg text-sm font-bold hover:bg-teal-100 transition-colors"
+            >
+                Ver Agenda Completa
+            </button>
+        </div>
+      </div>
+
+      {/* ============================================================ */}
+      {/* MODAL 1: NOVO AGENDAMENTO */}
+      {/* ============================================================ */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                
+                <div className="bg-teal-600 px-6 py-4 flex justify-between items-center text-white shrink-0">
+                    <h2 className="text-lg font-bold flex items-center gap-2">
+                        <Calendar size={20} /> Novo Agendamento
+                    </h2>
+                    <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSave} className="p-6 overflow-y-auto custom-scrollbar space-y-5">
+                    {/* Linha 1: Cliente e Telefone */}
+                    <div className="flex flex-col md:flex-row gap-4">
+                        <div className="flex-1">
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Cliente <span className="text-red-500">*</span></label>
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="Busque ou digite..." className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none" />
+                                
+                                {/* AQUI ESTÁ O BOTÃO QUE ABRE O CADASTRO DE PACIENTE */}
+                                <button 
+                                    type="button" 
+                                    onClick={() => setIsAuxModalOpen(true)}
+                                    className="bg-teal-50 text-teal-600 p-2 rounded-lg hover:bg-teal-100 border border-teal-100"
+                                    title="Novo Cliente"
+                                >
+                                    <UserPlus size={18} />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="w-full md:w-1/3">
+                             <label className="block text-xs font-bold text-gray-600 mb-1">Telefone</label>
+                             <input type="text" disabled placeholder="Automático..." className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-500 cursor-not-allowed" />
+                        </div>
+                    </div>
+
+                    {/* Linha 2 */}
+                    <div>
+                         <label className="block text-xs font-bold text-gray-600 mb-1">Procedimentos</label>
+                         <div className="flex gap-2">
+                             <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none bg-white">
+                                 <option>Consulta Rotina</option>
+                                 <option>Avaliação</option>
+                                 <option>Retorno</option>
+                             </select>
+                             <button type="button" className="bg-teal-50 text-teal-600 p-2 rounded-lg hover:bg-teal-100 border border-teal-100"><Edit2 size={18} /></button>
+                         </div>
+                    </div>
+
+                    {/* Linha 3 */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Profissional <span className="text-red-500">*</span></label>
+                            <div className="flex gap-2">
+                                <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none bg-white">
+                                    <option>Jessica Soares</option>
+                                    <option>Dr. João Silva</option>
+                                </select>
+                                <button type="button" className="bg-gray-100 text-gray-600 p-2 rounded-lg hover:bg-gray-200 border border-gray-200"><Plus size={18} /></button>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Local <span className="text-red-500">*</span></label>
+                            <div className="flex gap-2">
+                                <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none bg-white">
+                                    <option>Sala Avaliação</option>
+                                    <option>Consultório 1</option>
+                                </select>
+                                <button type="button" className="bg-gray-100 text-gray-600 p-2 rounded-lg hover:bg-gray-200 border border-gray-200"><Plus size={18} /></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Linha 4 */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Data <span className="text-red-500">*</span></label>
+                            <input type="date" className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none" />
+                        </div>
+                        <div>
+                             <label className="block text-xs font-bold text-gray-600 mb-1">Início <span className="text-red-500">*</span></label>
+                             <input type="time" defaultValue="08:00" className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none" />
+                        </div>
+                        <div>
+                             <label className="block text-xs font-bold text-gray-600 mb-1">Fim <span className="text-red-500">*</span></label>
+                             <input type="time" defaultValue="09:00" className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Notificar? <span className="text-red-500">*</span></label>
+                            <select className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none bg-white">
+                                <option>Não notificar</option>
+                                <option>Email</option>
+                                <option>Whatsapp</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-gray-700">Repetir?</label>
+                        <div className="relative inline-block w-10 h-6 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" className="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer left-1 top-1 peer checked:translate-x-full" />
+                            <div className="block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer peer-checked:bg-teal-500"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-600 mb-1">Motivo da Consulta</label>
+                        <textarea rows={3} placeholder="Descreva o motivo..." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-teal-500 outline-none resize-none"></textarea>
+                    </div>
+
+                    <div className="pt-4 border-t border-gray-100 flex justify-end gap-3 shrink-0 bg-white">
+                        <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 text-gray-600 font-medium hover:text-gray-800 transition-colors">Cancelar</button>
+                        <button type="submit" disabled={loading} className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm shadow-teal-200 transition-all">{loading ? "Salvando..." : <><Save size={18} /> Salvar</>}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODAL 2: AGENDA VISUAL */}
+      {/* ============================================================ */}
+      {isCalendarOpen && (
+        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+                <div className="bg-white px-6 py-5 border-b border-gray-100 flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-xl font-bold text-gray-800">Janeiro 2026</h2>
+                        <div className="flex gap-1">
+                            <button className="p-1 hover:bg-gray-100 rounded-full transition-all text-gray-600"><ChevronLeft size={20} /></button>
+                            <button className="p-1 hover:bg-gray-100 rounded-full transition-all text-gray-600"><ChevronRight size={20} /></button>
+                        </div>
+                    </div>
+                    <button onClick={() => setIsCalendarOpen(false)} className="bg-gray-50 hover:bg-red-50 hover:text-red-600 p-2 rounded-lg transition-colors"><X size={20} /></button>
+                </div>
+                {/* Calendário Body */}
+                <div className="p-6 bg-white">
+                    <div className="grid grid-cols-7 text-center mb-2">{["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"].map(day => <div key={day} className="text-xs font-bold text-gray-400 py-2">{day}</div>)}</div>
+                    <div className="grid grid-cols-7 border-t border-l border-gray-100">
+                        {[28, 29, 30, 31].map(day => <div key={`prev-${day}`} className="h-24 border-r border-b border-gray-100 p-2 text-gray-300 text-sm font-medium">{day}</div>)}
+                        {Array.from({length: 31}, (_, i) => i + 1).map(day => (<div key={day} className={`h-24 border-r border-b border-gray-100 p-2 relative group hover:bg-gray-50 transition-colors ${day === 8 ? 'bg-teal-50/30' : ''}`}><span className={`text-sm font-medium inline-flex w-7 h-7 items-center justify-center rounded-full ${day === 8 ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-700'}`}>{day}</span></div>))}
+                    </div>
+                </div>
+                <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end"><button onClick={openNewAppointment} className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-sm transition-all"><Plus size={20} /> Incluir Novo Agendamento</button></div>
+            </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODAL 3: NOVO PACIENTE (VINDO DA AGENDA) */}
+      {/* ============================================================ */}
+      {isAuxModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-xl">
+                    <h4 className="font-bold text-gray-800 text-lg">Novo Cadastro</h4>
+                    <button onClick={() => setIsAuxModalOpen(false)}><X size={20} className="text-gray-400 hover:text-red-500"/></button>
+                </div>
+                <div className="overflow-y-auto p-6 flex-1 custom-scrollbar">
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="md:col-span-2"><label className="text-xs font-bold text-gray-500 uppercase">Nome Completo</label><input type="text" className="w-full border rounded p-2 focus:ring-2 ring-cyan-100 outline-none" value={newPatientData.name} onChange={e => setNewPatientData({...newPatientData, name: e.target.value})} /></div>
+                            <div><label className="text-xs font-bold text-gray-500 uppercase">CPF</label><input type="text" className="w-full border rounded p-2 focus:ring-2 ring-cyan-100 outline-none" value={newPatientData.cpf} onChange={e => setNewPatientData({...newPatientData, cpf: e.target.value})} /></div>
+                        </div>
+                        <div className="border rounded-lg overflow-hidden">
+                            <div className="bg-cyan-600 px-4 py-2 text-white font-bold text-sm">Contatos</div>
+                            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div><label className="text-xs font-bold text-gray-700 mb-2 block">Telefones</label><div className="space-y-2 mb-2">{newPatientData.phones.map((phone, idx) => (<input key={idx} type="text" placeholder="(00) 00000-0000" className="w-full border rounded p-2 text-sm" value={phone} onChange={e => updateField('phones', idx, e.target.value)} />))}</div><button onClick={() => addField('phones')} className="text-pink-600 border border-pink-200 bg-pink-50 hover:bg-pink-100 text-xs font-bold px-3 py-1.5 rounded transition">Adicionar Telefone</button></div>
+                                <div><label className="text-xs font-bold text-gray-700 mb-2 block">Emails</label><div className="space-y-2 mb-2">{newPatientData.emails.map((email, idx) => (<input key={idx} type="email" placeholder="exemplo@email.com" className="w-full border rounded p-2 text-sm" value={email} onChange={e => updateField('emails', idx, e.target.value)} />))}</div><button onClick={() => addField('emails')} className="text-pink-600 border border-pink-200 bg-pink-50 hover:bg-pink-100 text-xs font-bold px-3 py-1.5 rounded transition">Adicionar Email</button></div>
+                            </div>
+                        </div>
+                        <div className="border rounded-lg overflow-hidden">
+                            <div className="bg-cyan-600 px-4 py-2 text-white font-bold text-sm">Endereços</div>
+                            <div className="p-4"><div className="space-y-2 mb-2">{newPatientData.addresses.map((addr, idx) => (<input key={idx} type="text" placeholder="Rua, Número, Bairro, Cidade..." className="w-full border rounded p-2 text-sm" value={addr} onChange={e => updateField('addresses', idx, e.target.value)} />))}</div><button onClick={() => addField('addresses')} className="text-pink-600 border border-pink-200 bg-pink-50 hover:bg-pink-100 text-xs font-bold px-3 py-1.5 rounded transition">Adicionar Endereço</button></div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="border rounded-lg overflow-hidden h-full">
+                                <div className="bg-cyan-600 px-4 py-2 text-white font-bold text-sm">Contato de Emergência</div>
+                                <div className="p-4 grid grid-cols-2 gap-3">
+                                    <div className="col-span-2"><label className="text-[10px] font-bold text-gray-500 uppercase">Nome</label><input type="text" className="w-full border rounded p-1.5 text-sm" value={newPatientData.emergencyName} onChange={e => setNewPatientData({...newPatientData, emergencyName: e.target.value})}/></div>
+                                    <div><label className="text-[10px] font-bold text-gray-500 uppercase">Telefone</label><input type="text" className="w-full border rounded p-1.5 text-sm" value={newPatientData.emergencyPhone} onChange={e => setNewPatientData({...newPatientData, emergencyPhone: e.target.value})}/></div>
+                                    <div><label className="text-[10px] font-bold text-gray-500 uppercase">Tipo Sanguíneo</label><select className="w-full border rounded p-1.5 text-sm bg-white" value={newPatientData.bloodType} onChange={e => setNewPatientData({...newPatientData, bloodType: e.target.value})}><option value="">Selecione</option><option value="A+">A+</option><option value="O+">O+</option></select></div>
+                                    <div className="col-span-2"><label className="text-[10px] font-bold text-gray-500 uppercase">Plano de Saúde</label><input type="text" className="w-full border rounded p-1.5 text-sm" value={newPatientData.healthPlan} onChange={e => setNewPatientData({...newPatientData, healthPlan: e.target.value})}/></div>
+                                </div>
+                            </div>
+                            <div className="border rounded-lg overflow-hidden h-full">
+                                <div className="bg-cyan-600 px-4 py-2 text-white font-bold text-sm">Responsáveis</div>
+                                <div className="p-4"><div className="space-y-2 mb-2">{newPatientData.responsibles.map((resp, idx) => (<input key={idx} type="text" placeholder="Nome do Responsável" className="w-full border rounded p-2 text-sm" value={resp} onChange={e => updateField('responsibles', idx, e.target.value)} />))}</div><button onClick={() => addField('responsibles')} className="text-pink-600 border border-pink-200 bg-pink-50 hover:bg-pink-100 text-xs font-bold px-3 py-1.5 rounded transition">Adicionar Responsável</button></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div className="p-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-xl">
+                    <button onClick={() => setIsAuxModalOpen(false)} className="text-sm font-medium text-gray-500 hover:text-gray-800 px-4 py-2">Cancelar</button>
+                    <button onClick={handleSavePatient} className="bg-pink-600 text-white text-sm font-bold px-6 py-2 rounded-lg hover:bg-pink-700 shadow-md shadow-pink-200">Salvar Cadastro</button>
+                </div>
+            </div>
+        </div>
+      )}
+
     </div>
   );
 }

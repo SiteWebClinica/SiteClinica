@@ -1,135 +1,146 @@
 "use client";
 
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import Link from "next/link";
-import { useState } from "react";
-import { useRouter } from "next/navigation"; // <--- Importante para redirecionar
-import { Loader2 } from "lucide-react"; // Ícone de carregamento bonitinho
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Lock, Mail, Loader2, AlertCircle } from "lucide-react"; // Se não tiver lucide, avise que troco por texto
 
-// Regras de validação (Schema)
-const loginSchema = z.object({
-  email: z.string().email("Digite um e-mail válido"),
-  password: z.string().min(1, "A senha é obrigatória"), // Mudei para min(1) pois senhas temporárias podem ser curtas
-});
+// Componente do Formulário (Lógica Principal)
+function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Pega o destino se existir (ex: /usuarios/pendentes)
+  const redirectUrl = searchParams.get("redirect");
 
-type LoginInputs = z.infer<typeof loginSchema>;
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-export default function LoginPage() {
-  const router = useRouter(); // Hook de navegação
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(""); // Para mostrar erros na tela
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginInputs>({
-    resolver: zodResolver(loginSchema),
-  });
-
-  async function onSubmit(data: LoginInputs) {
-    setIsLoading(true);
-    setErrorMessage("");
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
     try {
-      // 1. CHAMA A API REAL
       const res = await fetch("/api/auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
 
-      const result = await res.json();
+      const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(result.error || "Erro ao fazer login");
+        // Exibe erro (ex: Senha incorreta, Cadastro pendente)
+        setError(data.error || "Ocorreu um erro ao entrar.");
+        setLoading(false);
+        return;
       }
 
-      // 2. SALVA O USUÁRIO NO NAVEGADOR
-      // Isso permite que outras páginas saibam quem está logado
-      localStorage.setItem("clinica_user", JSON.stringify(result.user));
+      // === SUCESSO ===
+      
+      // 1. Salva os dados do usuário no navegador (para o Sidebar funcionar)
+      localStorage.setItem("clinica_user", JSON.stringify(data.user));
 
-      // 3. DECIDE PARA ONDE IR (A Lógica do Primeiro Acesso) 🚦
-      if (result.user.mustChangePassword) {
-        // Se a API disse que precisa trocar a senha:
-        router.push("/primeiro-acesso");
+      // 2. Redirecionamento Inteligente
+      if (redirectUrl) {
+        window.location.href = decodeURIComponent(redirectUrl);
       } else {
-        // Se está tudo normal:
-        router.push("/dashboard");
+        window.location.href = "/dashboard";
       }
 
-    } catch (error: any) {
-      setErrorMessage(error.message);
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      console.error(err);
+      setError("Erro de conexão. Tente novamente.");
+      setLoading(false);
     }
   }
 
   return (
-    <div>
-      <h2 className="text-center text-xl font-bold text-gray-800 mb-6">Acesse sua conta</h2>
-      
-      {/* Exibe erro se houver (ex: Senha incorreta) */}
-      {errorMessage && (
-        <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm mb-4 border border-red-200">
-          {errorMessage}
-        </div>
-      )}
+    <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+      <div className="text-center mb-8">
+        <h1 className="text-2xl font-bold text-gray-800">Bem-vindo de volta</h1>
+        <p className="text-gray-500 text-sm mt-2">Acesse sua conta para continuar</p>
+      </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* Campo E-mail */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">E-mail</label>
-          <input
-            {...register("email")}
-            type="email"
-            placeholder="admin@clinica.com"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-          />
-          {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+        {/* Erro Alert */}
+        {error && (
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm flex items-center gap-2">
+            <AlertCircle size={16} />
+            {error}
+          </div>
+        )}
+
+        {/* Input Email */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">E-mail</label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-3 text-gray-400" size={20} />
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
+              placeholder="seu@email.com"
+            />
+          </div>
         </div>
 
-        {/* Campo Senha */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Senha</label>
-          <input
-            {...register("password")}
-            type="password"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-          />
-          {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
+        {/* Input Senha */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">Senha</label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-3 text-gray-400" size={20} />
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
+              placeholder="••••••••"
+            />
+          </div>
         </div>
 
         {/* Botão Entrar */}
         <button
           type="submit"
-          disabled={isLoading}
-          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none disabled:opacity-50 transition-colors"
+          disabled={loading}
+          className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
         >
-          {isLoading ? (
-            <div className="flex items-center gap-2">
-              <Loader2 className="animate-spin" size={18} /> Verificando...
-            </div>
+          {loading ? (
+            <>
+              <Loader2 className="animate-spin" size={20} />
+              Entrando...
+            </>
           ) : (
-            "Entrar"
+            "Acessar Sistema"
           )}
         </button>
 
-        {/* Links Rodapé */}
-        <div className="flex justify-between text-sm mt-4">
-          <Link href="/recuperar" className="text-blue-600 hover:text-blue-500">
-            Esqueci a senha
-          </Link>
-          <Link href="/cadastro" className="text-blue-600 hover:text-blue-500">
-            Criar conta
-          </Link>
-        </div>
+        <p className="text-center text-sm text-gray-500">
+          Não tem uma conta?{" "}
+          <a href="/cadastro" className="text-teal-600 font-semibold hover:underline">
+            Cadastre-se
+          </a>
+        </p>
       </form>
+    </div>
+  );
+}
+
+// === COMPONENTE PRINCIPAL (WRAPPER) ===
+// Isso é obrigatório no Next.js quando usamos useSearchParams
+export default function LoginPage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <Suspense fallback={<div className="text-teal-600">Carregando formulário...</div>}>
+        <LoginForm />
+      </Suspense>
     </div>
   );
 }

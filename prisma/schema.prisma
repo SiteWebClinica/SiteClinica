@@ -8,17 +8,60 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  password  String
-  role      String   @default("USER")
-  status    String   @default("PENDING")
-  mustChangePassword Boolean @default(false) 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  password     String   // Será preenchida temporariamente no cadastro, e atualizada pelo Admin
+  
+  status       String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  active       Boolean  @default(false)
+  
+  // Role: "USER" (Comum), "ADMIN", "PROFESSIONAL"
+  role         String   @default("USER") 
+  
+  color        String?  @default("#0d9488")
+  serviceStart String?
+  serviceEnd   String?
+  
+  permissions  Json?
+  notifications Json?
+  commissions  Json?
+  
+  createdAt    DateTime @default(now())
+}
 
-  // NOVOS CAMPOS PARA RECUPERAÇÃO DE SENHA:
-  resetToken       String?   @unique
-  resetTokenExpiry DateTime?
+// prisma/schema.prisma
+
+model Appointment {
+  id           Int      @id @default(autoincrement())
+  title        String   // Nome do Cliente
+  phone        String?
+  procedure    String?
+  professional String?
+  location     String?
+  date         DateTime // Data e Hora juntas (ISO)
+  startTime    String   // Apenas visual "14:30"
+  endTime      String   // Apenas visual "15:00"
+  notes        String?
+  notify       String?  // nao_notificar, email, whatsapp
+  repeat       Boolean  @default(false)
+  type         String   // consultation ou exam
+  createdAt    DateTime @default(now())
+}
+
+model Patient {
+  id             Int      @id @default(autoincrement())
+  name           String
+  cpf            String   @unique
+  rg             String?
+  // Dados de Emergência
+  healthPlan     String?  // Plano de Saúde
+  bloodType      String?  // Tipo Sanguíneo
+  emergencyName  String?
+  emergencyPhone String?
+  // Listas Dinâmicas (Salvas como JSON)
+  contacts       Json?    // Ex: [{ type: 'phone', value: '...' }, { type: 'email', value: '...' }]
+  addresses      Json?    // Ex: [{ street: '...', city: '...' }]
+  responsibles   Json?    // Responsáveis
+  createdAt      DateTime @default(now())
 }

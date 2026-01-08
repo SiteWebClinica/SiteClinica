@@ -1,101 +1,79 @@
 "use client";
 
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import Link from "next/link";
 import { useState } from "react";
+import { Send, User, Mail, CheckCircle } from "lucide-react";
+import Link from "next/link";
 
-// Schema simplificado: Só nome e email
-const cadastroSchema = z.object({
-  name: z.string().min(3, "O nome precisa ter pelo menos 3 letras"),
-  email: z.string().email("Digite um e-mail válido"),
-});
+export default function PublicRegisterPage() {
+  const [formData, setFormData] = useState({ name: "", email: "" });
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-type CadastroInputs = z.infer<typeof cadastroSchema>;
-
-export default function CadastroPage() {
-  const [isLoading, setIsLoading] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<CadastroInputs>({
-    resolver: zodResolver(cadastroSchema),
-  });
-
-  async function onSubmit(data: CadastroInputs) {
-    setIsLoading(true);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/cadastro", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+        const res = await fetch("/api/auth/cadastro", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(formData)
+        });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        alert(result.error);
-        setIsLoading(false);
-        return;
-      }
-
-      // Mensagem de sucesso atualizada
-      alert("Solicitação enviada! Aguarde o administrador aprovar seu cadastro e enviar sua senha por e-mail.");
-      window.location.href = "/login";
-
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao conectar com o servidor.");
-      setIsLoading(false);
+        if (res.ok) setSuccess(true);
+        else alert("Erro ao solicitar. Email já cadastrado?");
+    } catch (err) {
+        alert("Erro de conexão.");
+    } finally {
+        setLoading(false);
     }
   }
 
+  if (success) {
+    return (
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+            <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+                <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle size={32} />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Solicitação Enviada!</h2>
+                <p className="text-gray-600 mb-6">
+                    O administrador irá analisar seu cadastro. Assim que aprovado, você receberá sua senha de acesso no email: <strong>{formData.email}</strong>.
+                </p>
+                <Link href="/login" className="text-teal-600 font-bold hover:underline">Voltar ao Login</Link>
+            </div>
+        </div>
+    );
+  }
+
   return (
-    <div>
-      <h2 className="text-center text-xl font-bold text-gray-800 mb-2">Solicitar Acesso</h2>
-      <p className="text-center text-gray-500 text-sm mb-6">
-        Informe seus dados. O administrador criará sua senha.
-      </p>
-      
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Nome Completo</label>
-          <input
-            {...register("name")}
-            type="text"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-          />
-          {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-teal-600 to-cyan-700 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="p-8">
+            <div className="text-center mb-8">
+                <h1 className="text-2xl font-bold text-gray-800">Solicitar Acesso</h1>
+                <p className="text-gray-500 text-sm">Preencha seus dados para análise</p>
+            </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">E-mail corporativo</label>
-          <input
-            {...register("email")}
-            type="email"
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900"
-          />
-          {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
-        </div>
+            <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="relative">
+                    <User className="absolute left-3 top-3 text-gray-400" size={20} />
+                    <input type="text" placeholder="Seu Nome Completo" required className="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:border-teal-500 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                </div>
+                <div className="relative">
+                    <Mail className="absolute left-3 top-3 text-gray-400" size={20} />
+                    <input type="email" placeholder="Seu E-mail Corporativo" required className="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:border-teal-500 outline-none" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                </div>
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none disabled:opacity-50 mt-4"
-        >
-          {isLoading ? "Enviando..." : "Solicitar Cadastro"}
-        </button>
-
-        <div className="text-center mt-4">
-          <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">
-            Voltar para o Login
-          </Link>
+                <button disabled={loading} className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2">
+                    {loading ? "Enviando..." : <><Send size={18} /> Enviar Solicitação</>}
+                </button>
+            </form>
         </div>
-      </form>
+        <div className="bg-gray-50 p-4 text-center border-t border-gray-100">
+            <Link href="/login" className="text-sm text-gray-600 hover:text-teal-600">Já tem acesso? Faça login</Link>
+        </div>
+      </div>
     </div>
   );
 }
