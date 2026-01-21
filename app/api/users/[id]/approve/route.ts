@@ -1,41 +1,42 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
+import { prisma } from "@/app/lib/prisma";
+import { hash } from "bcryptjs";
 
-const prisma = new PrismaClient();
-
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+// POST /api/users/[id]/approve
+export async function POST(
+    request: Request, 
+    { params }: { params: { id: string } }
+) {
   try {
-    const { role, password } = await req.json();
+    // 1. Pega o ID da URL e converte para número
     const id = parseInt(params.id);
+    
+    // 2. Pega os dados que vieram do Frontend
+    const body = await request.json();
+    const { userType, password } = body;
 
-    // 1. Criptografar a senha que o Admin criou
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // 3. Criptografa a nova senha
+    const hashedPassword = await hash(password, 10);
 
-    // 2. Atualizar o usuário
+    // 4. Atualiza o usuário no Banco
     const updatedUser = await prisma.user.update({
-      where: { id },
-      data: {
-        status: "APPROVED",
-        active: true,
-        role: role,
-        password: hashedPassword,
-        // Define permissões padrão baseadas no cargo
-        permissions: role === 'ADMIN' ? { admin: true, public: true, geral: true, financeiro: true } : { public: true, geral: true }
-      }
+        where: { id },
+        data: {
+            status: "APPROVED",     // Libera o status
+            active: true,           // Ativa a conta
+            password: hashedPassword, // Atualiza a senha provisória
+            userType: userType,     // Define se é admin, comum ou profissional
+            role: userType === 'admin' ? 'ADMIN' : 'USER' // Atualiza o role técnico também
+        }
     });
 
-    // 3. SIMULAR ENVIO DE EMAIL (Aqui entraria o Nodemailer/Resend)
-    console.log("======================================");
-    console.log(`📧 EMAIL ENVIADO PARA: ${updatedUser.email}`);
-    console.log(`Assunto: Bem-vindo ao Gestek!`);
-    console.log(`Olá ${updatedUser.name}, seu acesso foi aprovado.`);
-    console.log(`Sua senha temporária é: ${password}`);
-    console.log("======================================");
+    // 5. (Simulação) Aqui você enviaria o email de verdade usando uma lib como 'nodemailer' ou 'Resend'
+    console.log(`📧 Enviando email para ${updatedUser.email} com a senha: ${password}`);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, user: updatedUser });
 
   } catch (error) {
-    return NextResponse.json({ error: "Erro ao aprovar" }, { status: 500 });
+    console.error("Erro na aprovação:", error);
+    return NextResponse.json({ error: "Erro ao aprovar usuário" }, { status: 500 });
   }
 }

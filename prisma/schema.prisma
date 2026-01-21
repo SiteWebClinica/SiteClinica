@@ -12,7 +12,7 @@ model User {
   name         String
   email        String   @unique
   password     String   // Será preenchida temporariamente no cadastro, e atualizada pelo Admin
-  
+  userType      String    @default("comum")
   status       String   @default("PENDING") // PENDING, APPROVED, REJECTED
   active       Boolean  @default(false)
   
@@ -34,34 +34,77 @@ model User {
 
 model Appointment {
   id           Int      @id @default(autoincrement())
-  title        String   // Nome do Cliente
-  phone        String?
+  title        String   // Nome do cliente (para exibição rápida)
+  date         DateTime
+  startTime    String?
+  endTime      String?
   procedure    String?
   professional String?
   location     String?
-  date         DateTime // Data e Hora juntas (ISO)
-  startTime    String   // Apenas visual "14:30"
-  endTime      String   // Apenas visual "15:00"
+  phone        String?
+  notify       String?
   notes        String?
-  notify       String?  // nao_notificar, email, whatsapp
-  repeat       Boolean  @default(false)
-  type         String   // consultation ou exam
+  type         String?  // Ex: "consultation"
+  
+  // --- AQUI ESTÁ A CORREÇÃO (O RELACIONAMENTO) ---
+  patientId    Int?     // Campo que guarda o ID do paciente (Opcional para permitir agendar sem cadastro)
+  patient      Patient? @relation(fields: [patientId], references: [id]) 
+
   createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Patient {
-  id             Int      @id @default(autoincrement())
-  name           String
-  cpf            String   @unique
-  rg             String?
+  id            Int      @id @default(autoincrement())
+  name          String
+  cpf           String?  @unique
+  rg            String?
+  birthDate     DateTime? // Novo
+  age           String?   // Novo (pode ser calculado, mas vamos salvar por enquanto)
+  instagram     String?   // Novo
+  profession    String?   // Novo
+  workplace     String?   // Novo
+  gender        String?   // Novo
+  civilStatus   String?   // Novo
+  referral      String?   // Indicação
+  notes         String?   // Observações
+  
   // Dados de Emergência
-  healthPlan     String?  // Plano de Saúde
-  bloodType      String?  // Tipo Sanguíneo
   emergencyName  String?
   emergencyPhone String?
-  // Listas Dinâmicas (Salvas como JSON)
-  contacts       Json?    // Ex: [{ type: 'phone', value: '...' }, { type: 'email', value: '...' }]
-  addresses      Json?    // Ex: [{ street: '...', city: '...' }]
-  responsibles   Json?    // Responsáveis
-  createdAt      DateTime @default(now())
+  healthPlan     String?
+  bloodType      String?
+
+  // Relacionamentos (json ou tabelas separadas, mantendo simples aqui)
+  contacts      Contact[]
+  addresses     Address[]
+  responsibles  Responsible[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  appointments  Appointment[]
+}
+
+// --- TABELAS RELACIONADAS AO PACIENTE ---
+
+model Contact {
+  id        Int     @id @default(autoincrement())
+  type      String  // Ex: "phone" ou "email"
+  value     String  // Ex: "(11) 99999-9999"
+  patientId Int
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model Address {
+  id        Int     @id @default(autoincrement())
+  street    String  // Endereço completo
+  patientId Int
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model Responsible {
+  id        Int     @id @default(autoincrement())
+  name      String  // Nome do responsável
+  patientId Int
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }

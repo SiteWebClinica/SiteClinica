@@ -1,63 +1,43 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
-
-const prisma = new PrismaClient({
-  datasourceUrl: process.env.DATABASE_URL,
-});
+import { prisma } from "@/app/lib/prisma";
+import { compare } from "bcryptjs";
+import { cookies } from "next/headers";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { email, password } = body;
 
-    // 1. Busca o usuário pelo e-mail
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user || !(await compare(password, user.password))) {
+      return NextResponse.json({ error: "Email ou senha inválidos" }, { status: 401 });
+    }
+
+    if (user.status !== "APPROVED") {
+      return NextResponse.json({ error: "Conta pendente de aprovação." }, { status: 403 });
+    }
+
+    const tokenValue = JSON.stringify({ id: user.id, email: user.email, role: user.userType });
+
+    // --- CORREÇÃO AQUI: Adicione o await ---
+    const cookieStore = await cookies();
+    
+    cookieStore.set("clinica.token", tokenValue, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7, // 7 dias
+      path: "/",
     });
 
-    if (!user) {
-      return NextResponse.json({ error: "E-mail ou senha incorretos." }, { status: 401 });
-    }
-
-    // 2. SEGURANÇA: Verifica se o Admin aprovou
-    // IMPORTANTE: No banco está "APPROVED", não "ACTIVE".
-    // Também verificamos a coluna 'active' (booleana) por garantia.
-    if (user.status !== "APPROVED" || !user.active) {
-      return NextResponse.json(
-        { error: "Seu cadastro ainda está em análise ou foi desativado." },
-        { status: 403 }
-      );
-    }
-
-    // 3. Verifica a senha
-    const passwordMatch = await bcrypt.compare(password, user.password);
-
-    if (!passwordMatch) {
-      return NextResponse.json({ error: "E-mail ou senha incorretos." }, { status: 401 });
-    }
-
-    // 4. Sucesso! Retorna os dados
-    return NextResponse.json({
-      message: "Login realizado com sucesso!",
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        mustChangePassword: user.mustChangePassword,
-        
-        // --- O PULO DO GATO ---
-        // Precisamos devolver as permissões para o Menu Lateral funcionar!
-        permissions: user.permissions || {} 
-      },
-      // Se seu front usa token, mande um fake ou gere um JWT aqui. 
-      // Se não usa, pode deixar sem.
-      token: "token-de-sessao-valido" 
+    return NextResponse.json({ 
+      id: user.id, 
+      name: user.name, 
+      email: user.email, 
+      userType: user.userType 
     });
 
   } catch (error) {
-    console.error("Erro no login:", error);
-    return NextResponse.json({ error: "Erro interno do servidor." }, { status: 500 });
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

@@ -1,30 +1,30 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/app/lib/prisma";
 
 export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const status = searchParams.get("status"); // Pega o ?status=PENDING da URL
+
   try {
-    // 1. Pega os parâmetros da URL (ex: ?status=PENDING)
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
-
-    // 2. Monta o filtro (Se tiver status, filtra. Se não, traz tudo)
-    const whereCondition = status ? { status: status } : {};
-
-    // 3. Busca no banco
     const users = await prisma.user.findMany({
-      where: whereCondition,
-      orderBy: {
-        id: 'desc' // Mostra os mais novos primeiro
+      where: {
+        // Se vier status na URL, filtra. Se não, traz todos.
+        status: status ? String(status) : undefined 
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { // Seleciona só o necessário para segurança (não manda a senha)
+        id: true,
+        name: true,
+        email: true,
+        status: true,
+        userType: true,
+        createdAt: true
       }
     });
 
-    // 4. Retorna a lista
     return NextResponse.json(users);
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
-    console.error("Erro ao listar usuários:", error);
-    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao buscar usuários" }, { status: 500 });
   }
 }
