@@ -1,47 +1,71 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
-// GET: Buscar todos os pacientes (para a lista e busca)
+// --- LISTAR TODOS (GET) ---
 export async function GET() {
   try {
     const patients = await prisma.patient.findMany({
-      orderBy: { name: 'asc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        contacts: true, // Traz os telefones e emails
+      }
     });
     return NextResponse.json(patients);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
     return NextResponse.json({ error: "Erro ao buscar pacientes" }, { status: 500 });
   }
 }
 
-// POST: Criar novo paciente
+// --- CRIAR NOVO (POST) ---
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const { contacts, addresses, responsibles, phones, emails, ...patientData } = body;
 
-    // Validação básica
-    if (!body.name || !body.cpf) {
-      return NextResponse.json({ error: "Nome e CPF são obrigatórios" }, { status: 400 });
+    // CORREÇÃO: Definindo o tipo explicitamente
+    const contactsToCreate: any[] = []; 
+
+    if (Array.isArray(phones)) {
+      phones.forEach((phone: string) => {
+        if (phone.trim()) contactsToCreate.push({ type: 'phone', value: phone });
+      });
+    }
+
+    if (Array.isArray(emails)) {
+      emails.forEach((email: string) => {
+        if (email.trim()) contactsToCreate.push({ type: 'email', value: email });
+      });
+    }
+
+    let birthDateValid = null;
+    if (patientData.birthDate) {
+        const dateObj = new Date(patientData.birthDate);
+        if (!isNaN(dateObj.getTime())) {
+            birthDateValid = dateObj;
+        }
     }
 
     const patient = await prisma.patient.create({
       data: {
-        name: body.name,
-        cpf: body.cpf,
-        rg: body.rg,
-        healthPlan: body.healthPlan,
-        bloodType: body.bloodType,
-        emergencyName: body.emergencyName,
-        emergencyPhone: body.emergencyPhone,
-        contacts: body.contacts,       // Salva o JSON direto
-        addresses: body.addresses,     // Salva o JSON direto
-        responsibles: body.responsibles // Salva o JSON direto
+        ...patientData,
+        birthDate: birthDateValid,
+        contacts: {
+          create: contactsToCreate,
+        },
+        addresses: {
+          create: Array.isArray(addresses) ? addresses.filter((a: any) => a && a.trim()).map((a: string) => ({ street: a })) : [],
+        },
+        responsibles: {
+          create: Array.isArray(responsibles) ? responsibles.filter((r: any) => r && r.trim()).map((r: string) => ({ name: r })) : [],
+        },
       },
     });
 
     return NextResponse.json(patient);
-  } catch (error) {
-    console.error("Erro ao criar paciente:", error);
-    return NextResponse.json({ error: "Erro ao criar paciente" }, { status: 500 });
+  } catch (error: any) {
+    console.error("❌ ERRO NO BACKEND:", error.message || error);
+    return NextResponse.json({ error: "Erro ao criar paciente: " + error.message }, { status: 500 });
   }
 }

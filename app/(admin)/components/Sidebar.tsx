@@ -66,7 +66,7 @@ export default function Sidebar() {
           <Calendar size={18} /> Agenda
         </Link>
 
-        <Link href="/pacientes" className={linkClass("/pacientes")}>
+        <Link href="/clientes" className={linkClass("/clientes")}>
           <Users size={18} /> Clientes
         </Link>
 

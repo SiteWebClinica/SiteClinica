@@ -1,44 +1,57 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
-// GET: Buscar agenda
+// --- LISTAR AGENDAMENTOS (GET) ---
 export async function GET() {
   try {
     const appointments = await prisma.appointment.findMany({
-      orderBy: { date: 'asc' }
+      orderBy: { date: 'asc' }, // Ordena por data
     });
     return NextResponse.json(appointments);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
-    return NextResponse.json({ error: "Erro ao buscar agenda" }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao buscar agendamentos" }, { status: 500 });
   }
 }
 
-// POST: Criar agendamento
+// --- CRIAR AGENDAMENTO (POST) ---
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    
+    const { 
+      title, phone, date, startTime, endTime, 
+      procedure, professional, location, notify, repeat, notes, color 
+    } = body;
+
+    // Tenta encontrar o paciente pelo nome para vincular (opcional)
+    const patient = await prisma.patient.findFirst({
+        where: { name: { equals: title, mode: 'insensitive' } }
+    });
 
     const appointment = await prisma.appointment.create({
       data: {
-        title: body.title, // Nome do Cliente
-        phone: body.phone,
-        procedure: body.procedure,
-        professional: body.professional,
-        location: body.location,
-        date: new Date(body.date), // Importante: Converter string para Date
-        startTime: body.startTime,
-        endTime: body.endTime,
-        notes: body.notes,
-        notify: body.notify,
-        repeat: body.repeat,
-        type: body.type || "consultation"
+        title,
+        phone,
+        date: new Date(date), // Garante que é objeto Date
+        startTime,
+        endTime,
+        // --- NOVOS CAMPOS ---
+        procedure,
+        professional,
+        location,
+        notify,
+        repeat,
+        notes,
+        color,
+        // Vincula o ID do paciente se encontrou
+        patientId: patient?.id || null 
       },
     });
 
     return NextResponse.json(appointment);
-  } catch (error) {
-    console.error("Erro ao agendar:", error);
+  } catch (error: any) {
+    console.error("Erro ao criar agendamento:", error);
     return NextResponse.json({ error: "Erro ao criar agendamento" }, { status: 500 });
   }
 }

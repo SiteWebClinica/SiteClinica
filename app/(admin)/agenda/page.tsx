@@ -1,360 +1,424 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { 
-  format, 
-  addMonths, 
-  subMonths, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfWeek, 
-  endOfWeek, 
-  eachDayOfInterval, 
-  isSameMonth, 
-  isSameDay, 
-  isToday 
+  Calendar as CalendarIcon, ChevronLeft, ChevronRight, 
+  Plus, X, UserPlus, Trash2, Search
+} from "lucide-react";
+import { 
+  format, addMonths, subMonths, startOfMonth, endOfMonth, 
+  startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, 
+  isSameDay, parseISO, differenceInYears, isToday 
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Clock, 
-  Plus, 
-  Trash2, 
-  Edit3, 
-  X, 
-  Save,
-  Calendar as CalendarIcon,
-  Pencil,
-  UserPlus,
-  Check,
-  User
-} from "lucide-react";
-import clsx from "clsx";
-
-// --- TIPAGEM ---
-type Appointment = {
-  id: number;
-  date: Date;
-  title: string;
-  phone: string | null;
-  procedure: string | null;
-  professional: string | null;
-  location: string | null;
-  startTime: string;
-  endTime: string;
-  notes: string | null;
-  notify: string | null;
-  repeat: boolean;
-  type: string;
-};
-
-type Patient = {
-  id: number;
-  name: string;
-  cpf: string;
-  contacts: any[];
-};
 
 export default function AgendaPage() {
-  // --- ESTADOS ---
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const router = useRouter();
+  const [user, setUser] = useState<any>({ name: "Carregando..." });
   
-  // Estado dos Dados (Do Banco)
-  const [events, setEvents] = useState<Appointment[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
-  
-  // Estado da Busca de Pacientes
-  const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
+  // --- ESTADO DO CALENDÁRIO ---
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // --- MODAIS (ESTADOS SEPARADOS) ---
+  const [isModalOpen, setIsModalOpen] = useState(false);       
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false); 
+
+  // --- ESTADOS DA BUSCA INTELIGENTE ---
+  const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Controle dos Modais
-  const [isModalOpen, setIsModalOpen] = useState(false); // Modal de Agendamento
-  const [editingId, setEditingId] = useState<number | null>(null);
-  
-  // --- MODAL AUXILIAR (Novo Item/Paciente) ---
-  const [isAuxModalOpen, setIsAuxModalOpen] = useState(false);
-  const [auxType, setAuxType] = useState<"patient" | "procedure" | "professional" | "location" | null>(null);
-  const [newItemName, setNewItemName] = useState("");
-
-  // Listas Dinâmicas
-  const [proceduresList, setProceduresList] = useState(["Consulta Rotina", "Exame Geral", "Retorno"]);
-  const [professionalsList, setProfessionalsList] = useState(["Jessica Soares", "Dr. João"]);
-  const [locationsList, setLocationsList] = useState(["Sala Avaliação", "Sala 1"]);
-
-  // Estado do Novo Paciente (Complexo)
-  const [newPatientData, setNewPatientData] = useState({
-    name: "", cpf: "", rg: "", healthPlan: "", bloodType: "", emergencyName: "", emergencyPhone: "",
-    phones: [""] as string[], emails: [""] as string[], addresses: [""] as string[], responsibles: [""] as string[]
-  });
-
-  // Formulário de Agendamento
+  // --- FORMULÁRIO DE AGENDAMENTO ---
   const [formData, setFormData] = useState({
-    title: "", phone: "", procedure: "", professional: "", location: "",
+    title: "", phone: "", procedure: "Consulta Rotina", professional: "Jessica Soares", location: "Sala Avaliação",
     date: "", startTime: "08:00", endTime: "09:00", notify: "nao_notificar", repeat: false, notes: "", type: "consultation"
   });
 
-  // --- CARREGAR DADOS ---
+  // --- FORMULÁRIO DE NOVO PACIENTE ---
+  const [newPatientData, setNewPatientData] = useState({
+    name: "", birthDate: "", age: "", rg: "", cpf: "", instagram: "", 
+    profession: "", workplace: "", gender: "", civilStatus: "", referral: "", notes: "",
+    healthPlan: "", bloodType: "", emergencyName: "", emergencyPhone: "",
+    phones: [""] as string[], emails: [""] as string[], addresses: [""] as string[], responsibles: [""] as string[]
+  });
+
+  // --- INICIALIZAÇÃO ---
   useEffect(() => {
-    // 1. Carregar Agendamentos
-    fetch("/api/appointments")
-      .then((res) => res.json())
-      .then((data) => {
-        const formattedEvents = data.map((evt: any) => ({ ...evt, date: new Date(evt.date) }));
-        setEvents(formattedEvents);
-      });
+    const stored = localStorage.getItem("user");
+    if (stored) setUser(JSON.parse(stored));
+    else router.push("/login");
+    fetchAppointments();
+  }, [currentMonth]);
 
-    // 2. Carregar Pacientes
-    fetch("/api/patients")
-      .then((res) => res.json())
-      .then((data) => setPatients(data));
-  }, []);
-
-  // --- NAVEGAÇÃO ---
-  function nextMonth() { setCurrentDate(addMonths(currentDate, 1)); }
-  function prevMonth() { setCurrentDate(subMonths(currentDate, 1)); }
-  function jumpToToday() {
-    const today = new Date();
-    setCurrentDate(today);
-    setSelectedDate(today);
+  async function fetchAppointments() {
+    try {
+      const res = await fetch("/api/appointments");
+      const data = await res.json();
+      setAppointments(data);
+    } catch (error) { console.error("Erro ao buscar agenda:", error); }
   }
 
-  // --- LÓGICA DE PACIENTES ---
-  const handleClientNameChange = (text: string) => {
-    setFormData({ ...formData, title: text });
-    if (text.length > 0) {
-      const matches = patients.filter(p => p.name.toLowerCase().includes(text.toLowerCase()));
-      setFilteredPatients(matches);
-      setShowSuggestions(true);
-    } else { setShowSuggestions(false); }
-  };
+  // --- BUSCA INTELIGENTE DE CLIENTE ---
+  const handleClientSearch = (text: string) => {
+    setFormData(prev => ({ ...prev, title: text }));
+    
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
 
-  const selectPatient = (patient: Patient) => {
-    let phoneStr = "";
-    if (Array.isArray(patient.contacts)) {
-        const firstPhone = patient.contacts.find((c: any) => c.type === 'phone');
-        if (firstPhone) phoneStr = firstPhone.value;
-    }
-    setFormData({ ...formData, title: patient.name, phone: phoneStr });
-    setShowSuggestions(false);
-  };
-
-  // --- LÓGICA MODAL AUXILIAR (ADICIONAR) ---
-  function openAddModal(type: "patient" | "procedure" | "professional" | "location") {
-    setAuxType(type);
-    setNewItemName("");
-    setNewPatientData({
-        name: "", cpf: "", rg: "", healthPlan: "", bloodType: "", emergencyName: "", emergencyPhone: "",
-        phones: [""], emails: [""], addresses: [""], responsibles: [""]
-    });
-    setIsAuxModalOpen(true);
-  }
-
-  const addField = (field: 'phones' | 'emails' | 'addresses' | 'responsibles') => { setNewPatientData(prev => ({ ...prev, [field]: [...prev[field], ""] })); };
-  const updateField = (field: 'phones' | 'emails' | 'addresses' | 'responsibles', index: number, value: string) => {
-      const newList = [...newPatientData[field]]; newList[index] = value; setNewPatientData(prev => ({ ...prev, [field]: newList }));
-  };
-
-  async function handleSaveNewItem() {
-    // Salvar Paciente
-    if (auxType === "patient") {
-        if(!newPatientData.name || !newPatientData.cpf) return alert("Nome e CPF obrigatórios!");
-        const contacts = [...newPatientData.phones.filter(p => p).map(p => ({ type: 'phone', value: p })), ...newPatientData.emails.filter(e => e).map(e => ({ type: 'email', value: e }))];
-        const payload = {
-            name: newPatientData.name, cpf: newPatientData.cpf, rg: newPatientData.rg, healthPlan: newPatientData.healthPlan, bloodType: newPatientData.bloodType, emergencyName: newPatientData.emergencyName, emergencyPhone: newPatientData.emergencyPhone, contacts: contacts, addresses: newPatientData.addresses.filter(a => a).map(a => ({ street: a })), responsibles: newPatientData.responsibles.filter(r => r).map(r => ({ name: r }))
-        };
-        try {
-            const res = await fetch("/api/patients", { method: "POST", body: JSON.stringify(payload) });
-            const created = await res.json();
-            setPatients(prev => [...prev, created]);
-            selectPatient(created);
-            setIsAuxModalOpen(false);
-        } catch (err) { alert("Erro ao cadastrar."); }
+    if (text.length < 2) {
+        setSuggestions([]);
+        setShowSuggestions(false);
         return;
     }
-    // Salvar Item Simples
-    if (!newItemName.trim()) return;
-    if (auxType === "procedure") { setProceduresList(prev => [...prev, newItemName]); setFormData(prev => ({ ...prev, procedure: newItemName })); }
-    else if (auxType === "professional") { setProfessionalsList(prev => [...prev, newItemName]); setFormData(prev => ({ ...prev, professional: newItemName })); }
-    else if (auxType === "location") { setLocationsList(prev => [...prev, newItemName]); setFormData(prev => ({ ...prev, location: newItemName })); }
-    setIsAuxModalOpen(false);
-  }
 
-  // --- CRUD AGENDAMENTO ---
-  function handleOpenCreate() {
-    setEditingId(null);
-    setFormData({
-      title: "", phone: "", 
-      procedure: proceduresList[0], professional: professionalsList[0], location: locationsList[0],
-      date: format(selectedDate, "yyyy-MM-dd"), startTime: "08:00", endTime: "09:00", notify: "nao_notificar", repeat: false, notes: "", type: "consultation"
-    });
+    searchTimeout.current = setTimeout(async () => {
+        try {
+            const res = await fetch(`/api/patients/search?q=${text}`);
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+                setSuggestions(data);
+                setShowSuggestions(true);
+            } else {
+                setShowSuggestions(false);
+            }
+        } catch (e) { console.error(e); }
+    }, 300);
+  };
+
+  const selectSuggestion = (client: any) => {
+      setFormData(prev => ({ 
+          ...prev, 
+          title: client.name, 
+          phone: client.phone || prev.phone 
+      }));
+      setSuggestions([]);
+      setShowSuggestions(false);
+  };
+
+  // --- NAVEGAÇÃO DO CALENDÁRIO ---
+  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+  const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+  const goToToday = () => setCurrentMonth(new Date());
+
+  const handleDayClick = (date: Date) => {
+    setFormData(prev => ({ ...prev, date: format(date, 'yyyy-MM-dd') }));
     setIsModalOpen(true);
+  };
+
+  // --- LÓGICA DO CLIENTE NOVO (BLINDADA) ---
+  type ListField = 'phones' | 'emails' | 'addresses' | 'responsibles';
+
+  const addField = (field: ListField) => {
+      setNewPatientData(prev => ({
+          ...prev,
+          [field]: [...prev[field], ""]
+      }));
+  };
+  
+  const updateField = (field: ListField, index: number, value: string) => {
+      setNewPatientData(prev => {
+          const newList = [...prev[field]];
+          newList[index] = value;
+          return { ...prev, [field]: newList };
+      });
+  };
+  
+  // Aqui estava o segredo: usar prev => filter
+  const removeField = (field: ListField, index: number) => {
+      setNewPatientData(prev => ({
+          ...prev,
+          [field]: prev[field].filter((_, i) => i !== index)
+      }));
+  };
+
+  const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const date = e.target.value;
+      let age = "";
+      if (date) age = differenceInYears(new Date(), new Date(date)).toString();
+      setNewPatientData(prev => ({ ...prev, birthDate: date, age }));
+  };
+
+  async function handleSavePatient() {
+      if(!newPatientData.name) return alert("Nome é obrigatório!");
+      setLoading(true);
+      try {
+        const payload = {
+            ...newPatientData,
+            birthDate: newPatientData.birthDate ? new Date(newPatientData.birthDate) : null,
+            contacts: [ ...newPatientData.phones.filter(p => p).map(p => ({ type: 'phone', value: p })), ...newPatientData.emails.filter(e => e).map(e => ({ type: 'email', value: e })) ],
+            addresses: newPatientData.addresses.filter(a => a).map(a => ({ street: a })),
+            responsibles: newPatientData.responsibles.filter(r => r).map(r => ({ name: r }))
+        };
+        const res = await fetch("/api/patients", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        if (res.ok) {
+            alert(`✅ Cliente ${newPatientData.name} salvo!`);
+            setIsClientModalOpen(false);
+            setFormData(prev => ({ ...prev, title: newPatientData.name }));
+            setNewPatientData({ name: "", birthDate: "", age: "", rg: "", cpf: "", instagram: "", profession: "", workplace: "", gender: "", civilStatus: "", referral: "", notes: "", healthPlan: "", bloodType: "", emergencyName: "", emergencyPhone: "", phones: [""], emails: [""], addresses: [""], responsibles: [""] });
+        } else alert("Erro ao salvar.");
+      } catch (e) { alert("Erro de conexão."); } finally { setLoading(false); }
   }
 
-  function handleOpenEdit(evt: Appointment) {
-    setEditingId(evt.id);
-    setFormData({
-      title: evt.title, phone: evt.phone || "", procedure: evt.procedure || "", professional: evt.professional || "", location: evt.location || "",
-      date: format(evt.date, "yyyy-MM-dd"), startTime: evt.startTime, endTime: evt.endTime, notify: evt.notify || "nao_notificar", repeat: evt.repeat, notes: evt.notes || "", type: evt.type
-    });
-    setIsModalOpen(true);
-  }
-
-  async function handleSave() {
-    if (!formData.title) return alert("Selecione um cliente!");
-    const payload = { ...formData, date: new Date(formData.date + "T00:00:00") };
+  // --- SALVAR AGENDAMENTO ---
+  async function handleSaveAppointment(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
     try {
-      if (editingId) {
-        const res = await fetch(`/api/appointments/${editingId}`, { method: "PUT", body: JSON.stringify(payload) });
-        const updated = await res.json();
-        setEvents(prev => prev.map(e => e.id === editingId ? { ...updated, date: new Date(updated.date) } : e));
-      } else {
-        const res = await fetch("/api/appointments", { method: "POST", body: JSON.stringify(payload) });
-        const created = await res.json();
-        setEvents(prev => [...prev, { ...created, date: new Date(created.date) }]);
-      }
-      setIsModalOpen(false);
-    } catch (error) { alert("Erro ao salvar."); }
+        const response = await fetch("/api/appointments", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...formData, date: new Date(formData.date + "T00:00:00") })
+        });
+        if (response.ok) {
+            alert("✅ Agendamento criado!");
+            setIsModalOpen(false);
+            fetchAppointments();
+        } else alert("Erro ao criar agendamento.");
+    } catch (error) { alert("Erro de conexão."); } finally { setLoading(false); }
   }
 
-  async function handleDelete(id: number) {
-    if (confirm("Excluir?")) {
-      await fetch(`/api/appointments/${id}`, { method: "DELETE" });
-      setEvents(prev => prev.filter(e => e.id !== id));
-      setIsModalOpen(false);
-    }
-  }
-
-  // --- RENDERIZAÇÃO ---
-  const monthStart = startOfMonth(currentDate);
+  // --- CONFIGURAÇÃO DO CALENDÁRIO ---
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(monthStart);
   const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(endOfMonth(monthStart));
+  const endDate = endOfWeek(monthEnd);
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
-  const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  const selectedDayEvents = events.filter((event) => isSameDay(event.date, selectedDate));
+  const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+  // Estilos
+  const inputStyle = "w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-cyan-500 outline-none bg-white";
+  const labelStyle = "block text-xs font-bold text-gray-600 mb-1";
+  const headerStyle = "bg-[#00acc1] px-4 py-2 text-white font-bold text-sm rounded-t-lg";
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] gap-6 relative">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       
-      {/* --- MODAL AUXILIAR (NOVO PACIENTE/ITEM) --- */}
-      {isAuxModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-in fade-in">
-            <div className={`bg-white rounded-xl shadow-2xl w-full ${auxType === 'patient' ? 'max-w-4xl' : 'max-w-xs'} max-h-[90vh] flex flex-col`}>
-                <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-xl"><h4 className="font-bold text-gray-800 text-lg">{auxType === "patient" ? "Novo Cadastro" : "Adicionar Item"}</h4><button onClick={() => setIsAuxModalOpen(false)}><X size={20} className="text-gray-400 hover:text-red-500"/></button></div>
-                <div className="overflow-y-auto p-6 flex-1">
-                    {auxType === "patient" ? (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4"><div className="md:col-span-2"><label className="text-xs font-bold text-gray-500 uppercase">Nome Completo</label><input type="text" className="w-full border rounded p-2 focus:ring-2 ring-cyan-100 outline-none" value={newPatientData.name} onChange={e => setNewPatientData({...newPatientData, name: e.target.value})} /></div><div><label className="text-xs font-bold text-gray-500 uppercase">CPF</label><input type="text" className="w-full border rounded p-2 focus:ring-2 ring-cyan-100 outline-none" value={newPatientData.cpf} onChange={e => setNewPatientData({...newPatientData, cpf: e.target.value})} /></div></div>
-                            <div className="border rounded-lg overflow-hidden"><div className="bg-cyan-600 px-4 py-2 text-white font-bold text-sm">Contatos</div><div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-8"><div><label className="text-xs font-bold text-gray-700 mb-2 block">Telefones</label><div className="space-y-2 mb-2">{newPatientData.phones.map((phone, idx) => (<input key={idx} type="text" placeholder="(00) 00000-0000" className="w-full border rounded p-2 text-sm" value={phone} onChange={e => updateField('phones', idx, e.target.value)} />))}</div><button onClick={() => addField('phones')} className="text-pink-600 border border-pink-200 bg-pink-50 hover:bg-pink-100 text-xs font-bold px-3 py-1.5 rounded transition">Adicionar Telefone</button></div><div><label className="text-xs font-bold text-gray-700 mb-2 block">Emails</label><div className="space-y-2 mb-2">{newPatientData.emails.map((email, idx) => (<input key={idx} type="email" placeholder="exemplo@email.com" className="w-full border rounded p-2 text-sm" value={email} onChange={e => updateField('emails', idx, e.target.value)} />))}</div><button onClick={() => addField('emails')} className="text-pink-600 border border-pink-200 bg-pink-50 hover:bg-pink-100 text-xs font-bold px-3 py-1.5 rounded transition">Adicionar Email</button></div></div></div>
-                            <div className="border rounded-lg overflow-hidden"><div className="bg-cyan-600 px-4 py-2 text-white font-bold text-sm">Endereços</div><div className="p-4"><div className="space-y-2 mb-2">{newPatientData.addresses.map((addr, idx) => (<input key={idx} type="text" placeholder="Rua, Número, Bairro, Cidade..." className="w-full border rounded p-2 text-sm" value={addr} onChange={e => updateField('addresses', idx, e.target.value)} />))}</div><button onClick={() => addField('addresses')} className="text-pink-600 border border-pink-200 bg-pink-50 hover:bg-pink-100 text-xs font-bold px-3 py-1.5 rounded transition">Adicionar Endereço</button></div></div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div className="border rounded-lg overflow-hidden h-full"><div className="bg-cyan-600 px-4 py-2 text-white font-bold text-sm">Contato de Emergência</div><div className="p-4 grid grid-cols-2 gap-3"><div className="col-span-2"><label className="text-[10px] font-bold text-gray-500 uppercase">Nome</label><input type="text" className="w-full border rounded p-1.5 text-sm" value={newPatientData.emergencyName} onChange={e => setNewPatientData({...newPatientData, emergencyName: e.target.value})}/></div><div><label className="text-[10px] font-bold text-gray-500 uppercase">Telefone</label><input type="text" className="w-full border rounded p-1.5 text-sm" value={newPatientData.emergencyPhone} onChange={e => setNewPatientData({...newPatientData, emergencyPhone: e.target.value})}/></div><div><label className="text-[10px] font-bold text-gray-500 uppercase">Tipo Sanguíneo</label><select className="w-full border rounded p-1.5 text-sm bg-white" value={newPatientData.bloodType} onChange={e => setNewPatientData({...newPatientData, bloodType: e.target.value})}><option value="">Selecione</option><option value="A+">A+</option><option value="O+">O+</option></select></div><div className="col-span-2"><label className="text-[10px] font-bold text-gray-500 uppercase">Plano de Saúde</label><input type="text" className="w-full border rounded p-1.5 text-sm" value={newPatientData.healthPlan} onChange={e => setNewPatientData({...newPatientData, healthPlan: e.target.value})}/></div></div></div><div className="border rounded-lg overflow-hidden h-full"><div className="bg-cyan-600 px-4 py-2 text-white font-bold text-sm">Responsáveis</div><div className="p-4"><div className="space-y-2 mb-2">{newPatientData.responsibles.map((resp, idx) => (<input key={idx} type="text" placeholder="Nome do Responsável" className="w-full border rounded p-2 text-sm" value={resp} onChange={e => updateField('responsibles', idx, e.target.value)} />))}</div><button onClick={() => addField('responsibles')} className="text-pink-600 border border-pink-200 bg-pink-50 hover:bg-pink-100 text-xs font-bold px-3 py-1.5 rounded transition">Adicionar Responsável</button></div></div></div>
-                        </div>
-                    ) : (
-                        <input type="text" autoFocus placeholder="Digite o nome..." className="w-full border border-gray-300 rounded-lg p-2 outline-none focus:border-cyan-500" value={newItemName} onChange={e => setNewItemName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSaveNewItem()}/>
-                    )}
+      {/* HEADER SUPERIOR */}
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-10">
+        <div className="flex items-center gap-4">
+            <Link href="/dashboard" className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors">
+                <ChevronLeft size={24} />
+            </Link>
+            <div className="flex items-center gap-4">
+                <h1 className="text-xl font-bold text-gray-800 capitalize">
+                    {format(currentMonth, "MMMM yyyy", { locale: ptBR })}
+                </h1>
+                <div className="flex gap-1">
+                    <button onClick={prevMonth} className="p-1 hover:bg-gray-100 rounded text-gray-600"><ChevronLeft size={20}/></button>
+                    <button onClick={goToToday} className="px-3 py-1 text-xs font-bold bg-teal-50 text-teal-700 rounded hover:bg-teal-100">Hoje</button>
+                    <button onClick={nextMonth} className="p-1 hover:bg-gray-100 rounded text-gray-600"><ChevronRight size={20}/></button>
                 </div>
-                <div className="p-4 border-t bg-gray-50 flex justify-end gap-2 rounded-b-xl"><button onClick={() => setIsAuxModalOpen(false)} className="text-sm font-medium text-gray-500 hover:text-gray-800 px-4 py-2">Cancelar</button><button onClick={handleSaveNewItem} className="bg-pink-600 text-white text-sm font-bold px-6 py-2 rounded-lg hover:bg-pink-700 shadow-md shadow-pink-200">Salvar Cadastro</button></div>
             </div>
         </div>
-      )}
+        <div className="flex items-center gap-3">
+             <button onClick={() => { setFormData(prev => ({...prev, date: format(new Date(), 'yyyy-MM-dd')})); setIsModalOpen(true); }} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm">
+                <Plus size={20}/> <span className="hidden sm:inline">Novo Agendamento</span>
+             </button>
+        </div>
+      </header>
 
-      {/* --- MODAL DE AGENDAMENTO (PRINCIPAL) --- */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] transition-all">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-teal-600 text-white"><h3 className="font-bold flex items-center gap-2"><CalendarIcon size={18}/>{editingId ? "Editar Agendamento" : "Novo Agendamento"}</h3><button onClick={() => setIsModalOpen(false)} className="text-white/80 hover:text-white p-1 rounded-full"><X size={20} /></button></div>
-            <div className="flex-1 overflow-y-auto p-6 bg-gray-50 space-y-5">
-                
-                {/* CAMPO DE CLIENTE (BUSCA INTELIGENTE) */}
-                <div className="grid grid-cols-12 gap-4">
-                    <div className="col-span-8 relative">
-                        <label className="text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">Cliente <span className="text-red-500">*</span></label>
-                        <div className="flex gap-2">
-                            <div className="relative w-full">
-                                <input type="text" placeholder="Busque ou digite..." className="w-full h-10 px-3 rounded-lg border border-gray-300 focus:border-teal-500 outline-none" value={formData.title} onChange={e => handleClientNameChange(e.target.value)} onFocus={() => formData.title && setShowSuggestions(true)} autoFocus />
-                                {showSuggestions && filteredPatients.length > 0 && (<div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 z-20 max-h-40 overflow-y-auto">{filteredPatients.map(p => (<div key={p.id} onClick={() => selectPatient(p)} className="p-2 hover:bg-teal-50 cursor-pointer text-sm text-gray-700 border-b border-gray-50 last:border-0"><span className="font-bold">{p.name}</span> <span className="text-xs text-gray-400">({p.cpf})</span></div>))}</div>)}
-                            </div>
-                            <button onClick={() => openAddModal("patient")} className="h-10 w-10 flex items-center justify-center bg-teal-100 text-teal-700 rounded-lg hover:bg-teal-200 border border-teal-200" title="Cadastrar Novo Cliente"><UserPlus size={18}/></button>
+      {/* CALENDÁRIO GRID */}
+      <main className="flex-1 p-6 max-w-7xl mx-auto w-full flex flex-col">
+        <div className="grid grid-cols-7 mb-2">
+            {weekDays.map(day => (
+                <div key={day} className="text-center text-sm font-bold text-gray-400 uppercase tracking-wide">{day}</div>
+            ))}
+        </div>
+        <div className="flex-1 grid grid-cols-7 grid-rows-5 gap-2 min-h-[600px]">
+            {calendarDays.map((day, idx) => {
+                const dayAppts = appointments.filter(appt => isSameDay(parseISO(appt.date), day));
+                const isCurrentMonth = isSameMonth(day, monthStart);
+                const isTodayDate = isToday(day);
+
+                return (
+                    <div key={idx} onClick={() => handleDayClick(day)} className={`border rounded-lg p-2 flex flex-col gap-1 cursor-pointer transition-all hover:shadow-md relative overflow-hidden group ${isCurrentMonth ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-100 text-gray-400'} ${isTodayDate ? 'ring-2 ring-teal-500 ring-offset-2' : ''}`}>
+                        <div className="flex justify-between items-start">
+                            <span className={`text-sm font-bold ${isCurrentMonth ? 'text-gray-700' : 'text-gray-300'} ${isTodayDate ? 'text-teal-600' : ''}`}>{format(day, 'd')}</span>
+                            <div className="opacity-0 group-hover:opacity-100 bg-teal-50 text-teal-600 p-0.5 rounded transition-opacity"><Plus size={14} /></div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1 mt-1">
+                            {dayAppts.map(appt => (
+                                <div key={appt.id} className="text-[10px] bg-teal-50 text-teal-800 px-1 py-0.5 rounded border border-teal-100 truncate font-medium flex items-center gap-1">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0"></div> {appt.startTime} {appt.title}
+                                </div>
+                            ))}
+                            {dayAppts.length > 3 && <div className="text-[10px] text-gray-400 text-center font-bold">+ {dayAppts.length - 3} mais</div>}
                         </div>
                     </div>
-                    <div className="col-span-4"><label className="text-xs font-bold text-gray-600 mb-1">Telefone</label><input type="text" className="w-full h-10 px-3 rounded-lg border border-gray-300 bg-gray-100 outline-none" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="Automático..." /></div>
+                );
+            })}
+        </div>
+      </main>
+
+      {/* --- MODAL 1: NOVO AGENDAMENTO (COM BUSCA!) --- */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="bg-teal-600 px-6 py-4 flex justify-between items-center text-white shrink-0">
+                    <h2 className="text-lg font-bold flex items-center gap-2"><CalendarIcon size={20} /> Novo Agendamento</h2>
+                    <button onClick={() => setIsModalOpen(false)}><X size={20} /></button>
                 </div>
+                <form onSubmit={handleSaveAppointment} className="p-6 overflow-y-auto space-y-4">
+                    
+                    {/* CAMPO DE CLIENTE COM BUSCA INTELIGENTE */}
+                    <div className="flex gap-2 items-end">
+                        <div className="flex-1 relative">
+                            <label className={labelStyle}>Cliente <span className="text-red-500">*</span></label>
+                            <div className="relative">
+                                <input 
+                                    type="text" 
+                                    required 
+                                    className={`${inputStyle} pr-8`} 
+                                    value={formData.title} 
+                                    onChange={(e) => handleClientSearch(e.target.value)} 
+                                    placeholder="Digite para buscar..." 
+                                    autoComplete="off"
+                                />
+                                <Search className="absolute right-2 top-2.5 text-gray-400" size={16}/>
+                            </div>
+                            
+                            {/* LISTA DE SUGESTÕES */}
+                            {showSuggestions && (
+                                <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-b-lg shadow-xl mt-1 max-h-40 overflow-y-auto">
+                                    {suggestions.map((client, idx) => (
+                                        <div 
+                                            key={idx} 
+                                            onClick={() => selectSuggestion(client)}
+                                            className="p-2 hover:bg-teal-50 cursor-pointer text-sm text-gray-700 border-b border-gray-50 last:border-0"
+                                        >
+                                            <p className="font-bold">{client.name}</p>
+                                            {client.phone && <p className="text-xs text-gray-500">{client.phone}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <button type="button" onClick={() => setIsClientModalOpen(true)} className="bg-teal-100 text-teal-700 px-3 py-2 rounded hover:bg-teal-200 border border-teal-200 h-[38px] mb-[1px]" title="Novo Cadastro"><UserPlus size={20}/></button>
+                    </div>
 
-                {/* PROCEDIMENTO */}
-                <div><label className="text-xs font-bold text-gray-600 mb-1">Procedimentos</label><div className="flex gap-2"><select className="w-full h-10 px-3 rounded-lg border border-gray-300 bg-white focus:border-teal-500 outline-none" value={formData.procedure} onChange={e => setFormData({...formData, procedure: e.target.value})}><option value="">Selecione...</option>{proceduresList.map(p=><option key={p} value={p}>{p}</option>)}</select><button onClick={() => openAddModal("procedure")} className="h-10 w-10 flex items-center justify-center bg-teal-100 text-teal-700 rounded-lg hover:bg-teal-200 border border-teal-200"><Pencil size={18}/></button></div></div>
-
-                {/* PROFISSIONAL & LOCAL */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div><label className="text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">Profissional <span className="text-red-500">*</span></label><div className="flex gap-2"><select className="w-full h-10 px-3 rounded-lg border border-gray-300 bg-white focus:border-teal-500 outline-none" value={formData.professional} onChange={e => setFormData({...formData, professional: e.target.value})}><option value="">Selecione...</option>{professionalsList.map(p=><option key={p} value={p}>{p}</option>)}</select><button onClick={() => openAddModal("professional")} className="h-10 w-10 flex items-center justify-center bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 border border-gray-200"><Plus size={16}/></button></div></div>
-                    <div><label className="text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">Local <span className="text-red-500">*</span></label><div className="flex gap-2"><select className="w-full h-10 px-3 rounded-lg border border-gray-300 bg-white focus:border-teal-500 outline-none" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})}><option value="">Selecione...</option>{locationsList.map(l=><option key={l} value={l}>{l}</option>)}</select><button onClick={() => openAddModal("location")} className="h-10 w-10 flex items-center justify-center bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 border border-gray-200"><Plus size={16}/></button></div></div>
-                </div>
-
-                {/* DATA, HORA E NOTIFICAÇÃO */}
-                <div className="grid grid-cols-12 gap-4">
-                     <div className="col-span-4"><label className="text-xs font-bold text-gray-600 mb-1 flex gap-1">Data <span className="text-red-500">*</span></label><input type="date" className="w-full h-10 px-3 rounded-lg border border-gray-300 focus:border-teal-500 outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
-                     <div className="col-span-2"><label className="text-xs font-bold text-gray-600 mb-1 flex gap-1">Início <span className="text-red-500">*</span></label><input type="time" className="w-full h-10 px-2 rounded-lg border border-gray-300 focus:border-teal-500 outline-none text-center" value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} /></div>
-                     <div className="col-span-2"><label className="text-xs font-bold text-gray-600 mb-1 flex gap-1">Fim <span className="text-red-500">*</span></label><input type="time" className="w-full h-10 px-2 rounded-lg border border-gray-300 focus:border-teal-500 outline-none text-center" value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} /></div>
-                     <div className="col-span-4"><label className="text-xs font-bold text-gray-600 mb-1 flex gap-1">Notificar? <span className="text-red-500">*</span></label><select className="w-full h-10 px-3 rounded-lg border border-gray-300 bg-white focus:border-teal-500 outline-none" value={formData.notify} onChange={e => setFormData({...formData, notify: e.target.value})}><option value="nao_notificar">Não notificar</option><option value="email">E-mail</option><option value="whatsapp">WhatsApp</option></select></div>
-                </div>
-
-                {/* REPETIR E MOTIVO */}
-                <div className="flex items-center gap-3"><label className="text-sm font-medium text-gray-700">Repetir?</label><button onClick={() => setFormData({...formData, repeat: !formData.repeat})} className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${formData.repeat ? 'bg-teal-600' : 'bg-gray-300'}`}><div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${formData.repeat ? 'translate-x-5' : 'translate-x-0'}`}></div></button></div>
-                <div><label className="text-xs font-bold text-gray-600 mb-1">Motivo da Consulta</label><textarea className="w-full h-20 p-3 rounded-lg border border-gray-300 focus:border-teal-500 outline-none resize-none" placeholder="Descreva o motivo..." value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})}></textarea></div>
-
-                {/* FOOTER BOTÕES */}
-                <div className="flex gap-3 pt-4 border-t border-gray-200 mt-4">
-                     {editingId && (<button onClick={() => handleDelete(editingId)} className="p-3 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition border border-red-100"><Trash2 size={20}/></button>)}
-                     <div className="flex-1 flex justify-end gap-3"><button onClick={() => setIsModalOpen(false)} className="px-6 py-2 text-gray-600 font-medium hover:bg-gray-200 rounded-lg transition">Cancelar</button><button onClick={handleSave} className="px-8 py-2 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 shadow-lg shadow-teal-200 transition flex items-center gap-2"><Save size={18}/> Salvar</button></div>
-                </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><label className={labelStyle}>Telefone</label><input type="text" className={inputStyle} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
+                        <div><label className={labelStyle}>Procedimento</label><select className={inputStyle} value={formData.procedure} onChange={e => setFormData({...formData, procedure: e.target.value})}><option>Consulta Rotina</option><option>Avaliação</option></select></div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                        <div><label className={labelStyle}>Data</label><input type="date" required className={inputStyle} value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
+                        <div><label className={labelStyle}>Início</label><input type="time" required className={inputStyle} value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} /></div>
+                        <div><label className={labelStyle}>Fim</label><input type="time" required className={inputStyle} value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} /></div>
+                    </div>
+                    <div className="flex justify-end pt-4"><button type="submit" disabled={loading} className="bg-teal-600 text-white px-6 py-2 rounded font-bold hover:bg-teal-700">{loading ? "..." : "Salvar"}</button></div>
+                </form>
             </div>
-          </div>
         </div>
       )}
 
-      {/* --- CABEÇALHO --- */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div><h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">Agenda <span className="px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-medium border border-teal-100 capitalize">{format(currentDate, "MMMM yyyy", { locale: ptBR })}</span></h1><p className="text-gray-500 text-sm">Gerencie consultas e horários.</p></div>
-        <div className="flex items-center gap-2"><button onClick={jumpToToday} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">Hoje</button><button onClick={handleOpenCreate} className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm shadow-teal-200"><Plus size={18} /><span className="hidden sm:inline">Novo Agendamento</span></button></div>
-      </div>
+      {/* --- MODAL 2: NOVO CLIENTE (COMPLETO) --- */}
+      {isClientModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col">
+                <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white rounded-t-lg">
+                    <button onClick={() => setIsClientModalOpen(false)}><X size={24} className="text-gray-400 hover:text-red-500"/></button>
+                    <h4 className="text-gray-600 text-lg font-medium">Novo Cliente</h4>
+                    <button onClick={handleSavePatient} disabled={loading} className="bg-[#e91e63] hover:bg-pink-700 text-white px-6 py-1.5 rounded shadow text-sm font-medium">
+                        {loading ? "Salvando..." : "Salvar"}
+                    </button>
+                </div>
 
-      {/* --- ÁREA PRINCIPAL --- */}
-      <div className="flex flex-1 gap-8 overflow-hidden">
-        {/* CALENDÁRIO */}
-        <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-gray-100"><span className="font-semibold text-lg text-gray-700 capitalize">{format(currentDate, "MMMM yyyy", { locale: ptBR })}</span><div className="flex items-center gap-1"><button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-full text-gray-600"><ChevronLeft size={20} /></button><button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-full text-gray-600"><ChevronRight size={20} /></button></div></div>
-            <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50">{weekDays.map((day, i) => <div key={i} className="py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">{day}</div>)}</div>
-            <div className="flex-1 grid grid-cols-7 grid-rows-6">
-                {calendarDays.map((day) => {
-                    const hasEvents = events.some(evt => isSameDay(evt.date, day));
-                    return (
-                        <div key={day.toString()} onClick={() => setSelectedDate(day)} className={clsx("relative border-b border-r border-gray-100 p-2 cursor-pointer transition-colors hover:bg-gray-50 flex flex-col items-start justify-start gap-1", !isSameMonth(day, currentDate) ? "bg-gray-50/50 text-gray-400" : "bg-white", isSameDay(day, selectedDate) && "ring-2 ring-inset ring-teal-500 z-10")}>
-                            <span className={clsx("text-sm w-7 h-7 flex items-center justify-center rounded-full font-medium", isToday(day) ? "bg-teal-600 text-white" : "text-gray-700")}>{format(day, "d")}</span>
-                            {hasEvents && (<div className="flex gap-1 px-1 flex-wrap">{events.filter(e => isSameDay(e.date, day)).map((evt, i) => (<div key={i} className={clsx("w-2 h-2 rounded-full", "bg-indigo-400")} />))}</div>)}
+                <div className="overflow-y-auto p-6 flex-1 custom-scrollbar space-y-6 bg-[#f5f5f5]">
+                    {/* DADOS BÁSICOS */}
+                    <div className="bg-white shadow-sm rounded-lg overflow-hidden border border-gray-100">
+                        <div className={headerStyle}>Dados Básicos</div>
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="md:col-span-2"><label className={labelStyle}>Nome <span className="text-red-500">*</span></label><input type="text" className={inputStyle} value={newPatientData.name} onChange={e => setNewPatientData({...newPatientData, name: e.target.value})} /></div>
+                            <div><label className={labelStyle}>Data de Nascimento</label><input type="date" className={inputStyle} value={newPatientData.birthDate} onChange={handleBirthDateChange} /></div>
+                            <div><label className={labelStyle}>Idade</label><input type="text" disabled className={`${inputStyle} bg-gray-100`} value={newPatientData.age} /></div>
+                            <div><label className={labelStyle}>RG</label><input type="text" className={inputStyle} value={newPatientData.rg} onChange={e => setNewPatientData({...newPatientData, rg: e.target.value})} /></div>
+                            <div><label className={labelStyle}>CPF/CNPJ</label><input type="text" className={inputStyle} value={newPatientData.cpf} onChange={e => setNewPatientData({...newPatientData, cpf: e.target.value})} /></div>
+                            <div className="md:col-span-2"><label className={labelStyle}>Instagram</label><input type="text" className={inputStyle} value={newPatientData.instagram} onChange={e => setNewPatientData({...newPatientData, instagram: e.target.value})} /></div>
+                            <div className="md:col-span-2"><label className={labelStyle}>Profissão</label><input type="text" className={inputStyle} value={newPatientData.profession} onChange={e => setNewPatientData({...newPatientData, profession: e.target.value})} /></div>
+                            <div className="md:col-span-2"><label className={labelStyle}>Local de Trabalho</label><input type="text" className={inputStyle} value={newPatientData.workplace} onChange={e => setNewPatientData({...newPatientData, workplace: e.target.value})} /></div>
+                            <div><label className={labelStyle}>Gênero</label><select className={inputStyle} value={newPatientData.gender} onChange={e => setNewPatientData({...newPatientData, gender: e.target.value})}><option value="">Selecione</option><option value="Feminino">Feminino</option><option value="Masculino">Masculino</option></select></div>
+                            <div><label className={labelStyle}>Estado Civil</label><select className={inputStyle} value={newPatientData.civilStatus} onChange={e => setNewPatientData({...newPatientData, civilStatus: e.target.value})}><option value="">Selecione</option><option value="Solteiro">Solteiro</option><option value="Casado">Casado</option></select></div>
+                            <div className="md:col-span-2"><label className={labelStyle}>Indicação</label><select className={inputStyle} value={newPatientData.referral} onChange={e => setNewPatientData({...newPatientData, referral: e.target.value})}><option value="">Selecione</option><option value="Instagram">Instagram</option><option value="Google">Google</option></select></div>
+                            <div className="md:col-span-4"><label className={labelStyle}>Observações</label><textarea rows={2} className={inputStyle} value={newPatientData.notes} onChange={e => setNewPatientData({...newPatientData, notes: e.target.value})}></textarea></div>
                         </div>
-                    );
-                })}
+                    </div>
+
+                    {/* CONTATOS */}
+                    <div className="bg-white shadow-sm rounded-lg overflow-hidden border border-gray-100">
+                        <div className={headerStyle}>Contatos</div>
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div>
+                                <label className="text-sm font-bold text-gray-800 mb-2 block">Telefones</label>
+                                {newPatientData.phones.map((phone, idx) => (
+                                    <div key={idx} className="flex gap-2 mb-2">
+                                        <input type="text" className={inputStyle} placeholder="(00) 00000-0000" value={phone} onChange={e => updateField('phones', idx, e.target.value)} />
+                                        {/* BOTÃO CORRIGIDO AQUI EMBAIXO */}
+                                        <button type="button" onClick={() => removeField('phones', idx)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
+                                    </div>
+                                ))}
+                                <button type="button" onClick={() => addField('phones')} className="border border-pink-400 text-pink-500 hover:bg-pink-50 px-4 py-1.5 rounded text-sm font-medium mt-1">Adicionar Telefone</button>
+                            </div>
+                            <div>
+                                <label className="text-sm font-bold text-gray-800 mb-2 block">Emails</label>
+                                {newPatientData.emails.map((email, idx) => (
+                                    <div key={idx} className="flex gap-2 mb-2">
+                                        <input type="email" className={inputStyle} placeholder="email@exemplo.com" value={email} onChange={e => updateField('emails', idx, e.target.value)} />
+                                        <button type="button" onClick={() => removeField('emails', idx)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
+                                    </div>
+                                ))}
+                                <button type="button" onClick={() => addField('emails')} className="border border-pink-400 text-pink-500 hover:bg-pink-50 px-4 py-1.5 rounded text-sm font-medium mt-1">Adicionar Email</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ENDEREÇOS */}
+                    <div className="bg-white shadow-sm rounded-lg overflow-hidden border border-gray-100">
+                        <div className={headerStyle}>Endereços</div>
+                        <div className="p-6">
+                            {newPatientData.addresses.map((addr, idx) => (
+                                <div key={idx} className="flex gap-2 mb-2">
+                                    <input type="text" className={inputStyle} placeholder="Endereço Completo" value={addr} onChange={e => updateField('addresses', idx, e.target.value)} />
+                                    <button type="button" onClick={() => removeField('addresses', idx)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
+                                </div>
+                            ))}
+                            <button type="button" onClick={() => addField('addresses')} className="border border-pink-400 text-pink-500 hover:bg-pink-50 px-4 py-1.5 rounded text-sm font-medium mt-1">Adicionar Endereço</button>
+                        </div>
+                    </div>
+
+                    {/* EMERGÊNCIA E RESPONSÁVEIS */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white shadow-sm rounded-lg overflow-hidden border border-gray-100">
+                            <div className={headerStyle}>Contato de Emergência</div>
+                            <div className="p-6 grid grid-cols-2 gap-4">
+                                <div className="col-span-2"><label className={labelStyle}>Nome</label><input type="text" className={inputStyle} value={newPatientData.emergencyName} onChange={e => setNewPatientData({...newPatientData, emergencyName: e.target.value})} /></div>
+                                <div className="col-span-2"><label className={labelStyle}>Plano de Saúde</label><input type="text" className={inputStyle} value={newPatientData.healthPlan} onChange={e => setNewPatientData({...newPatientData, healthPlan: e.target.value})} /></div>
+                                <div><label className={labelStyle}>Telefone</label><input type="text" className={inputStyle} value={newPatientData.emergencyPhone} onChange={e => setNewPatientData({...newPatientData, emergencyPhone: e.target.value})} /></div>
+                                <div><label className={labelStyle}>Tipo Sanguíneo</label><select className={inputStyle} value={newPatientData.bloodType} onChange={e => setNewPatientData({...newPatientData, bloodType: e.target.value})}><option value="">Selecione</option><option value="A+">A+</option><option value="O+">O+</option><option value="AB+">AB+</option></select></div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white shadow-sm rounded-lg overflow-hidden border border-gray-100">
+                            <div className={headerStyle}>Responsáveis</div>
+                            <div className="p-6">
+                                {newPatientData.responsibles.map((resp, idx) => (
+                                    <div key={idx} className="flex gap-2 mb-2">
+                                        <input type="text" className={inputStyle} placeholder="Nome do Responsável" value={resp} onChange={e => updateField('responsibles', idx, e.target.value)} />
+                                        <button type="button" onClick={() => removeField('responsibles', idx)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
+                                    </div>
+                                ))}
+                                <button type="button" onClick={() => addField('responsibles')} className="border border-pink-400 text-pink-500 hover:bg-pink-50 px-4 py-1.5 rounded text-sm font-medium mt-1">Adicionar Responsável</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
             </div>
         </div>
+      )}
 
-        {/* BARRA LATERAL */}
-        <div className="w-80 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-            <div className="p-6 border-b border-gray-100 bg-gradient-to-br from-teal-50 to-white"><h2 className="text-gray-500 text-sm font-medium uppercase tracking-wide">Selecionado</h2><p className="text-3xl font-bold text-gray-800 mt-1 capitalize">{format(selectedDate, "EEEE", { locale: ptBR })}</p><p className="text-teal-600 font-medium">{format(selectedDate, "d 'de' MMMM", { locale: ptBR })}</p></div>
-            <div className="flex-1 p-4 overflow-y-auto space-y-3">
-                {selectedDayEvents.length === 0 ? (
-                    <div className="text-center py-10 text-gray-400"><Clock className="mx-auto mb-3 opacity-20" size={48} /><p className="text-sm">Nenhum agendamento para este dia.</p><button onClick={handleOpenCreate} className="mt-4 text-teal-600 text-sm font-medium hover:underline">+ Adicionar horário</button></div>
-                ) : (
-                    selectedDayEvents.map((event) => (
-                        <div key={event.id} className="group flex gap-4 p-3 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all relative pr-2">
-                            <div className="absolute right-2 top-2 hidden group-hover:flex gap-1 bg-white p-1 rounded-lg shadow-sm border border-gray-100 z-10"><button onClick={(e) => { e.stopPropagation(); handleOpenEdit(event); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Edit3 size={14}/></button><button onClick={(e) => { e.stopPropagation(); handleDelete(event.id); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 size={14}/></button></div>
-                            <div className="flex flex-col items-center pt-1 min-w-[3rem]"><span className="text-sm font-bold text-gray-700">{event.startTime}</span><div className="h-full w-0.5 bg-gray-100 mt-2 group-hover:bg-teal-200 transition-colors"></div></div>
-                            <div className="flex-1"><div className={clsx("w-full p-3 rounded-lg border-l-4 shadow-sm transition-colors", "bg-indigo-50 border-indigo-500")}><h4 className="font-semibold text-gray-800 text-sm leading-tight">{event.title}</h4><div className="flex items-center gap-2 mt-1.5 text-xs text-gray-500"><span className="capitalize">{event.procedure || "Consulta"}</span></div></div></div>
-                        </div>
-                    ))
-                )}
-            </div>
-        </div>
-      </div>
     </div>
   );
 }

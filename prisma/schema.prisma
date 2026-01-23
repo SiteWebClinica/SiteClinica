@@ -34,33 +34,38 @@ model User {
 
 model Appointment {
   id           Int      @id @default(autoincrement())
-  title        String   // Nome do cliente (para exibição rápida)
-  date         DateTime
-  startTime    String?
-  endTime      String?
-  procedure    String?
-  professional String?
-  location     String?
+  title        String   // Nome do cliente
   phone        String?
-  notify       String?
-  notes        String?
-  type         String?  // Ex: "consultation"
+  date         DateTime
+  startTime    String
+  endTime      String
   
-  // --- AQUI ESTÁ A CORREÇÃO (O RELACIONAMENTO) ---
-  patientId    Int?     // Campo que guarda o ID do paciente (Opcional para permitir agendar sem cadastro)
-  patient      Patient? @relation(fields: [patientId], references: [id]) 
+  // --- NOVOS CAMPOS ADICIONADOS ---
+  procedure    String?  // Procedimento (Consulta, Avaliação...)
+  professional String?  // Profissional (Joao, Jessica...)
+  location     String?  // Sala Principal, Sala 02...
+  notify       String?  @default("nao_notificar") // email, sms...
+  repeat       Boolean  @default(false)
+  notes        String?  // Motivo da consulta
+  color        String?  @default("blue") // Cor do agendamento
+  type         String   @default("consultation")
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  
+  // Relação com Paciente (Opcional, se você já tiver)
+  patientId    Int?
+  patient      Patient? @relation(fields: [patientId], references: [id])
 }
 
+// Atualize o model Patient existente
 model Patient {
-  id            Int      @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   name          String
-  cpf           String?  @unique
-  rg            String?
+  cpf           String?   @unique
+  rg            String?   // Novo
   birthDate     DateTime? // Novo
-  age           String?   // Novo (pode ser calculado, mas vamos salvar por enquanto)
+  age           String?   // Novo
   instagram     String?   // Novo
   profession    String?   // Novo
   workplace     String?   // Novo
@@ -68,43 +73,65 @@ model Patient {
   civilStatus   String?   // Novo
   referral      String?   // Indicação
   notes         String?   // Observações
-  
-  // Dados de Emergência
+
+  // Dados de Emergência / Saúde
   emergencyName  String?
   emergencyPhone String?
   healthPlan     String?
   bloodType      String?
 
-  // Relacionamentos (json ou tabelas separadas, mantendo simples aqui)
-  contacts      Contact[]
-  addresses     Address[]
-  responsibles  Responsible[]
+  // Relacionamentos
+  contacts     Contact[]
+  addresses    Address[]
+  responsibles Responsible[]
+  appointments Appointment[] // Relacionamento com agendamentos
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  appointments  Appointment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-// --- TABELAS RELACIONADAS AO PACIENTE ---
-
+// Adicione estes models no final do arquivo (se não tiver)
 model Contact {
   id        Int     @id @default(autoincrement())
-  type      String  // Ex: "phone" ou "email"
-  value     String  // Ex: "(11) 99999-9999"
+  type      String  // "phone" ou "email"
+  value     String
   patientId Int
   patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
 model Address {
   id        Int     @id @default(autoincrement())
-  street    String  // Endereço completo
+  street    String
   patientId Int
   patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
 model Responsible {
   id        Int     @id @default(autoincrement())
-  name      String  // Nome do responsável
+  name      String
   patientId Int
   patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model Service {
+  id        Int      @id @default(autoincrement())
+  name      String
+  active    Boolean  @default(true)
+}
+
+model Location {
+  id        Int      @id @default(autoincrement())
+  name      String
+  active    Boolean  @default(true)
+}
+
+model Professional {
+  id        Int     @id @default(autoincrement())
+  name      String
+  specialty String? // Especialidade (Ex: Cardiologista)
+  register  String? // CRM, CRO, etc.
+  phone     String?
+  email     String?
+  color     String  @default("blue") // Cor para o calendário
+  active    Boolean @default(true)
 }
