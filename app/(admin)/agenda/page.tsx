@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
   Calendar as CalendarIcon, ChevronLeft, ChevronRight, 
-  Plus, X, UserPlus, Trash2, Search
+  Plus, X, UserPlus, Trash2, Search, ChevronDown
 } from "lucide-react";
 import { 
   format, addMonths, subMonths, startOfMonth, endOfMonth, 
@@ -19,6 +19,11 @@ export default function AgendaPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>({ name: "Carregando..." });
   
+  // --- ESTADOS DE DADOS AUXILIARES (Vindo do Banco) ---
+  const [professionals, setProfessionals] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+
   // --- ESTADO DO CALENDÁRIO ---
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [appointments, setAppointments] = useState<any[]>([]);
@@ -27,6 +32,7 @@ export default function AgendaPage() {
   // --- MODAIS (ESTADOS SEPARADOS) ---
   const [isModalOpen, setIsModalOpen] = useState(false);       
   const [isClientModalOpen, setIsClientModalOpen] = useState(false); 
+  const [isProfModalOpen, setIsProfModalOpen] = useState(false);
 
   // --- ESTADOS DA BUSCA INTELIGENTE ---
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -35,8 +41,8 @@ export default function AgendaPage() {
 
   // --- FORMULÁRIO DE AGENDAMENTO ---
   const [formData, setFormData] = useState({
-    title: "", phone: "", procedure: "Consulta Rotina", professional: "Jessica Soares", location: "Sala Avaliação",
-    date: "", startTime: "08:00", endTime: "09:00", notify: "nao_notificar", repeat: false, notes: "", type: "consultation"
+    title: "", phone: "", procedure: "", professional: "", location: "",
+    date: "", startTime: "08:00", endTime: "09:00", notify: "nao_notificar", repeat: false, notes: "", color: "blue", type: "consultation"
   });
 
   // --- FORMULÁRIO DE NOVO PACIENTE ---
@@ -47,13 +53,42 @@ export default function AgendaPage() {
     phones: [""] as string[], emails: [""] as string[], addresses: [""] as string[], responsibles: [""] as string[]
   });
 
+  // --- FORMULÁRIO NOVO PROFISSIONAL ---
+  const [newProfData, setNewProfData] = useState({
+    name: "", specialty: "", register: "", phone: "", email: "", color: "blue"
+  });
+
   // --- INICIALIZAÇÃO ---
   useEffect(() => {
     const stored = localStorage.getItem("user");
     if (stored) setUser(JSON.parse(stored));
     else router.push("/login");
+    
     fetchAppointments();
+    fetchAuxiliaryData();
   }, [currentMonth]);
+
+  async function fetchAuxiliaryData() {
+      try {
+          const res = await fetch("/api/auxiliary");
+          if (res.ok) {
+            const data = await res.json();
+            setProfessionals(data.professionals || []);
+            setServices(data.services || []);
+            setLocations(data.locations || []);
+            
+            if (!formData.professional && data.professionals.length > 0) {
+                setFormData(prev => ({ ...prev, professional: data.professionals[0].name }));
+            }
+            if (!formData.procedure && data.services.length > 0) {
+                setFormData(prev => ({ ...prev, procedure: data.services[0].name }));
+            }
+            if (!formData.location && data.locations.length > 0) {
+                setFormData(prev => ({ ...prev, location: data.locations[0].name }));
+            }
+          }
+      } catch (e) { console.error("Erro ao carregar listas", e); }
+  }
 
   async function fetchAppointments() {
     try {
@@ -109,7 +144,7 @@ export default function AgendaPage() {
     setIsModalOpen(true);
   };
 
-  // --- LÓGICA DO CLIENTE NOVO (BLINDADA) ---
+  // --- LÓGICA DO CLIENTE NOVO ---
   type ListField = 'phones' | 'emails' | 'addresses' | 'responsibles';
 
   const addField = (field: ListField) => {
@@ -127,7 +162,6 @@ export default function AgendaPage() {
       });
   };
   
-  // Aqui estava o segredo: usar prev => filter
   const removeField = (field: ListField, index: number) => {
       setNewPatientData(prev => ({
           ...prev,
@@ -163,6 +197,27 @@ export default function AgendaPage() {
       } catch (e) { alert("Erro de conexão."); } finally { setLoading(false); }
   }
 
+  // --- SALVAR PROFISSIONAL ---
+  async function handleSaveProfessional() {
+      if (!newProfData.name) return alert("Nome é obrigatório!");
+      setLoading(true);
+      try {
+          const res = await fetch("/api/professionals", { 
+              method: "POST", 
+              headers: { "Content-Type": "application/json" }, 
+              body: JSON.stringify(newProfData) 
+          });
+          
+          if (res.ok) {
+              alert("Profissional cadastrado!");
+              setIsProfModalOpen(false);
+              fetchAuxiliaryData(); 
+              setNewProfData({ name: "", specialty: "", register: "", phone: "", email: "", color: "blue" });
+          } else { alert("Erro ao salvar."); }
+      } catch (e) { alert("Erro conexão."); } 
+      finally { setLoading(false); }
+  }
+
   // --- SALVAR AGENDAMENTO ---
   async function handleSaveAppointment(e: React.FormEvent) {
     e.preventDefault();
@@ -189,8 +244,10 @@ export default function AgendaPage() {
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
   // Estilos
-  const inputStyle = "w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-cyan-500 outline-none bg-white";
   const labelStyle = "block text-xs font-bold text-gray-600 mb-1";
+  const inputStyle = "w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#00acc1] focus:border-[#00acc1] outline-none bg-white text-gray-700 placeholder-gray-400";
+  const inputGroupLeft = "w-full border border-gray-300 rounded-l px-3 py-2 text-sm focus:ring-1 focus:ring-[#00acc1] focus:border-[#00acc1] outline-none bg-white text-gray-700 placeholder-gray-400";
+  const buttonGroupRight = "bg-teal-50 text-teal-600 px-3 py-2 rounded-r border border-l-0 border-gray-300 hover:bg-teal-100 transition-colors flex items-center justify-center";
   const headerStyle = "bg-[#00acc1] px-4 py-2 text-white font-bold text-sm rounded-t-lg";
 
   return (
@@ -242,7 +299,7 @@ export default function AgendaPage() {
                         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1 mt-1">
                             {dayAppts.map(appt => (
                                 <div key={appt.id} className="text-[10px] bg-teal-50 text-teal-800 px-1 py-0.5 rounded border border-teal-100 truncate font-medium flex items-center gap-1">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0"></div> {appt.startTime} {appt.title}
+                                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${appt.color === 'blue' ? 'bg-blue-500' : appt.color === 'green' ? 'bg-green-500' : 'bg-teal-500'}`}></div> {appt.startTime} {appt.title}
                                 </div>
                             ))}
                             {dayAppts.length > 3 && <div className="text-[10px] text-gray-400 text-center font-bold">+ {dayAppts.length - 3} mais</div>}
@@ -253,62 +310,56 @@ export default function AgendaPage() {
         </div>
       </main>
 
-      {/* --- MODAL 1: NOVO AGENDAMENTO (COM BUSCA!) --- */}
+      {/* --- MODAL 1: NOVO AGENDAMENTO (COMPLETO E IDÊNTICO À HOME) --- */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
-            <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="bg-teal-600 px-6 py-4 flex justify-between items-center text-white shrink-0">
-                    <h2 className="text-lg font-bold flex items-center gap-2"><CalendarIcon size={20} /> Novo Agendamento</h2>
-                    <button onClick={() => setIsModalOpen(false)}><X size={20} /></button>
+        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
+            <div className="bg-white w-full max-w-4xl rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+                <div className="bg-[#00acc1] px-6 py-3 flex justify-between items-center text-white shrink-0">
+                    <h2 className="text-lg font-bold">Novo Agendamento</h2>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white/10 px-2 py-1 rounded"><span>Cor</span><div className={`w-3 h-3 rounded-full border-2 border-white ${formData.color === 'blue' ? 'bg-blue-500' : formData.color === 'green' ? 'bg-green-500' : formData.color === 'red' ? 'bg-red-500' : 'bg-purple-500'}`}></div><ChevronDown size={14} /></div>
+                        <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20} /></button>
+                    </div>
                 </div>
-                <form onSubmit={handleSaveAppointment} className="p-6 overflow-y-auto space-y-4">
-                    
-                    {/* CAMPO DE CLIENTE COM BUSCA INTELIGENTE */}
-                    <div className="flex gap-2 items-end">
-                        <div className="flex-1 relative">
-                            <label className={labelStyle}>Cliente <span className="text-red-500">*</span></label>
-                            <div className="relative">
-                                <input 
-                                    type="text" 
-                                    required 
-                                    className={`${inputStyle} pr-8`} 
-                                    value={formData.title} 
-                                    onChange={(e) => handleClientSearch(e.target.value)} 
-                                    placeholder="Digite para buscar..." 
-                                    autoComplete="off"
-                                />
-                                <Search className="absolute right-2 top-2.5 text-gray-400" size={16}/>
-                            </div>
-                            
-                            {/* LISTA DE SUGESTÕES */}
-                            {showSuggestions && (
-                                <div className="absolute z-10 w-full bg-white border border-gray-200 rounded-b-lg shadow-xl mt-1 max-h-40 overflow-y-auto">
-                                    {suggestions.map((client, idx) => (
-                                        <div 
-                                            key={idx} 
-                                            onClick={() => selectSuggestion(client)}
-                                            className="p-2 hover:bg-teal-50 cursor-pointer text-sm text-gray-700 border-b border-gray-50 last:border-0"
-                                        >
-                                            <p className="font-bold">{client.name}</p>
-                                            {client.phone && <p className="text-xs text-gray-500">{client.phone}</p>}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        <button type="button" onClick={() => setIsClientModalOpen(true)} className="bg-teal-100 text-teal-700 px-3 py-2 rounded hover:bg-teal-200 border border-teal-200 h-[38px] mb-[1px]" title="Novo Cadastro"><UserPlus size={20}/></button>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div><label className={labelStyle}>Telefone</label><input type="text" className={inputStyle} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
-                        <div><label className={labelStyle}>Procedimento</label><select className={inputStyle} value={formData.procedure} onChange={e => setFormData({...formData, procedure: e.target.value})}><option>Consulta Rotina</option><option>Avaliação</option></select></div>
+                <form onSubmit={handleSaveAppointment} className="p-6 overflow-y-auto custom-scrollbar bg-white">
+                    <div className="grid grid-cols-12 gap-6">
+                        
+                        {/* CLIENTE + BOTÃO USER PLUS */}
+                        <div className="col-span-12 md:col-span-5 relative">
+                            <label className={labelStyle}>Cliente<span className="text-red-500">*</span></label>
+                            <div className="flex relative">
+                                <input type="text" required placeholder="Digite o nome do cliente" className={`${inputGroupLeft} pr-8`} value={formData.title} onChange={e => handleClientSearch(e.target.value)} autoComplete="off" />
+                                <Search className="absolute right-14 top-2.5 text-gray-400 pointer-events-none" size={16}/>
+                                <button type="button" onClick={() => setIsClientModalOpen(true)} className={buttonGroupRight} title="Novo Cliente"><UserPlus size={18} /></button>
+                                {showSuggestions && <div className="absolute z-10 w-full top-full left-0 bg-white border border-gray-200 rounded-b-lg shadow-xl mt-1 max-h-40 overflow-y-auto">{suggestions.map((client, idx) => (<div key={idx} onClick={() => selectSuggestion(client)} className="p-2 hover:bg-teal-50 cursor-pointer text-sm text-gray-700 border-b border-gray-50 last:border-0"><p className="font-bold">{client.name}</p></div>))}</div>}
+                            </div>
+                        </div>
+
+                        <div className="col-span-12 md:col-span-3"><label className={labelStyle}>Telefone</label><input type="text" className={inputStyle} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
+                        
+                        {/* PROFISSIONAL + BOTÃO PLUS */}
+                        <div className="col-span-12 md:col-span-4">
+                            <label className={labelStyle}>Profissional<span className="text-red-500">*</span></label>
+                            <div className="flex">
+                                <select className={inputGroupLeft} value={formData.professional} onChange={e => setFormData({...formData, professional: e.target.value})}>
+                                    {professionals.map(prof => <option key={prof.id} value={prof.name}>{prof.name}</option>)}
+                                </select>
+                                <button type="button" onClick={() => setIsProfModalOpen(true)} className={buttonGroupRight} title="Novo Profissional"><Plus size={18} /></button>
+                            </div>
+                        </div>
+
+                        {/* OUTROS CAMPOS */}
+                        <div className="col-span-12 md:col-span-8"><label className={labelStyle}>Procedimentos</label><select className={inputStyle} value={formData.procedure} onChange={e => setFormData({...formData, procedure: e.target.value})}>{services.map(srv => <option key={srv.id} value={srv.name}>{srv.name}</option>)}</select></div>
+                        <div className="col-span-12 md:col-span-4"><label className={labelStyle}>Local do Procedimento<span className="text-red-500">*</span></label><select className={inputStyle} value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})}>{locations.map(loc => <option key={loc.id} value={loc.name}>{loc.name}</option>)}</select></div>
+                        <div className="col-span-12 md:col-span-3"><label className={labelStyle}>Data<span className="text-red-500">*</span></label><input type="date" required className={inputStyle} value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
+                        <div className="col-span-6 md:col-span-2"><label className={labelStyle}>Hora Início<span className="text-red-500">*</span></label><input type="time" required className={inputStyle} value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} /></div>
+                        <div className="col-span-6 md:col-span-2"><label className={labelStyle}>Hora Fim<span className="text-red-500">*</span></label><input type="time" required className={inputStyle} value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} /></div>
+                        <div className="col-span-12 md:col-span-5"><label className={labelStyle}>Notificar Cliente?<span className="text-red-500">*</span></label><select className={inputStyle} value={formData.notify} onChange={e => setFormData({...formData, notify: e.target.value})}><option value="nao_notificar">Não notificar</option><option value="email">Email</option><option value="sms">SMS</option></select></div>
+                        <div className="col-span-12"><label className={labelStyle}>Repetir?</label><div onClick={() => setFormData(prev => ({ ...prev, repeat: !prev.repeat }))} className={`w-10 h-5 rounded-full flex items-center p-1 cursor-pointer transition-colors duration-300 ${formData.repeat ? 'bg-[#00acc1]' : 'bg-gray-300'}`}><div className={`bg-white w-3.5 h-3.5 rounded-full shadow-md transform transition-transform duration-300 ${formData.repeat ? 'translate-x-5' : ''}`}></div></div></div>
+                        <div className="col-span-12"><label className={labelStyle}>Motivo da Consulta</label><textarea rows={3} className={inputStyle} value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})}></textarea></div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
-                        <div><label className={labelStyle}>Data</label><input type="date" required className={inputStyle} value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
-                        <div><label className={labelStyle}>Início</label><input type="time" required className={inputStyle} value={formData.startTime} onChange={e => setFormData({...formData, startTime: e.target.value})} /></div>
-                        <div><label className={labelStyle}>Fim</label><input type="time" required className={inputStyle} value={formData.endTime} onChange={e => setFormData({...formData, endTime: e.target.value})} /></div>
-                    </div>
-                    <div className="flex justify-end pt-4"><button type="submit" disabled={loading} className="bg-teal-600 text-white px-6 py-2 rounded font-bold hover:bg-teal-700">{loading ? "..." : "Salvar"}</button></div>
+                    <div className="mt-6 flex justify-end pt-4 border-t border-gray-100"><button type="submit" disabled={loading} className="bg-[#00acc1] hover:bg-[#0097a7] text-white px-8 py-2 rounded shadow-sm font-medium transition-colors">{loading ? "Salvando..." : "Salvar"}</button></div>
                 </form>
             </div>
         </div>
@@ -355,7 +406,6 @@ export default function AgendaPage() {
                                 {newPatientData.phones.map((phone, idx) => (
                                     <div key={idx} className="flex gap-2 mb-2">
                                         <input type="text" className={inputStyle} placeholder="(00) 00000-0000" value={phone} onChange={e => updateField('phones', idx, e.target.value)} />
-                                        {/* BOTÃO CORRIGIDO AQUI EMBAIXO */}
                                         <button type="button" onClick={() => removeField('phones', idx)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
                                     </div>
                                 ))}
@@ -414,6 +464,27 @@ export default function AgendaPage() {
                         </div>
                     </div>
 
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* --- MODAL 3: NOVO PROFISSIONAL --- */}
+      {isProfModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white w-full max-w-2xl rounded-lg shadow-2xl overflow-hidden flex flex-col">
+                <div className="bg-[#00acc1] px-6 py-3 flex justify-between items-center text-white">
+                    <h2 className="text-lg font-bold">Novo Profissional</h2>
+                    <button onClick={() => setIsProfModalOpen(false)}><X size={20} /></button>
+                </div>
+                
+                <div className="p-6 grid grid-cols-2 gap-4">
+                    <div className="col-span-2"><label className={labelStyle}>Nome Completo <span className="text-red-500">*</span></label><input type="text" className={inputStyle} value={newProfData.name} onChange={e => setNewProfData({...newProfData, name: e.target.value})} /></div>
+                    <div><label className={labelStyle}>Especialidade</label><input type="text" className={inputStyle} placeholder="Ex: Cardiologista" value={newProfData.specialty} onChange={e => setNewProfData({...newProfData, specialty: e.target.value})} /></div>
+                    <div><label className={labelStyle}>Registro (CRM/CRO)</label><input type="text" className={inputStyle} value={newProfData.register} onChange={e => setNewProfData({...newProfData, register: e.target.value})} /></div>
+                    <div><label className={labelStyle}>Telefone</label><input type="text" className={inputStyle} value={newProfData.phone} onChange={e => setNewProfData({...newProfData, phone: e.target.value})} /></div>
+                    <div><label className={labelStyle}>Cor na Agenda</label><select className={inputStyle} value={newProfData.color} onChange={e => setNewProfData({...newProfData, color: e.target.value})}><option value="blue">Azul</option><option value="green">Verde</option><option value="red">Vermelho</option><option value="purple">Roxo</option><option value="orange">Laranja</option></select></div>
+                    <div className="col-span-2 pt-4 flex justify-end"><button onClick={handleSaveProfessional} disabled={loading} className="bg-[#00acc1] hover:bg-[#0097a7] text-white px-6 py-2 rounded font-bold shadow-sm">{loading ? "Salvando..." : "Salvar Profissional"}</button></div>
                 </div>
             </div>
         </div>
