@@ -18,6 +18,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Conta pendente de aprovação." }, { status: 403 });
     }
 
+    if (!user.active) {
+      return NextResponse.json({ error: "Esta conta está inativa. Fale com a administração." }, { status: 403 });
+    }
+
     const tokenValue = JSON.stringify({ id: user.id, email: user.email, role: user.userType });
 
     // --- CORREÇÃO AQUI: Adicione o await ---
@@ -34,10 +38,11 @@ export async function POST(request: Request) {
       id: user.id, 
       name: user.name, 
       email: user.email, 
-      userType: user.userType 
+      userType: user.userType,
+      mustChangePassword: user.mustChangePassword,
     });
 
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }

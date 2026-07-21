@@ -1,89 +1,48 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Lock, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { CheckCircle2, Loader2, LockKeyhole } from "lucide-react";
+
+type User = { id: number; name: string; email: string; userType: string; mustChangePassword?: boolean };
 
 export default function PrimeiroAcessoPage() {
-  const [user, setUser] = useState<any>(null);
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Pega o usuário que acabou de logar
-    const stored = localStorage.getItem("clinica_user");
-    if (stored) setUser(JSON.parse(stored));
-    else window.location.href = "/login";
-  }, []);
+    const stored = localStorage.getItem("user");
+    const frame = requestAnimationFrame(() => {
+      if (!stored) { router.replace("/login"); return; }
+      try { setUser(JSON.parse(stored) as User); } catch { router.replace("/login"); }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [router]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (password !== confirmPassword) {
-      alert("As senhas não coincidem.");
-      return;
-    }
-
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); setMessage("");
+    if (password.length < 8) return setMessage("Use pelo menos 8 caracteres.");
+    if (password !== confirm) return setMessage("As senhas não coincidem.");
+    if (!user) return;
     setLoading(true);
-
     try {
-      const res = await fetch("/api/auth/update-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          userId: user.id, 
-          newPassword: password 
-        }),
-      });
-
-      if (res.ok) {
-        // Atualiza o localStorage para desligar o aviso
-        user.mustChangePassword = false;
-        localStorage.setItem("clinica_user", JSON.stringify(user));
-        
-        alert("Senha atualizada! Bem-vindo ao sistema.");
-        window.location.href = "/dashboard";
-      } else {
-        alert("Erro ao atualizar senha.");
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+      const res = await fetch("/api/auth/update-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: user.id, newPassword: password }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Não foi possível atualizar.");
+      const updated = { ...user, mustChangePassword: false };
+      localStorage.setItem("user", JSON.stringify(updated));
+      router.replace("/dashboard");
+    } catch (err) { setMessage(err instanceof Error ? err.message : "Erro de conexão."); }
+    finally { setLoading(false); }
   }
 
-  if (!user) return null;
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-yellow-50 p-4">
-      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border-t-4 border-yellow-400">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">👋 Olá, {user.name}!</h1>
-        <p className="text-gray-600 text-sm mb-6">
-          Como este é seu primeiro acesso, precisamos que você troque sua senha temporária por uma definitiva.
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-sm font-medium text-gray-700">Nova Senha Pessoal</label>
-            <div className="relative mt-1">
-              <Lock className="absolute left-3 top-3 text-gray-400" size={18} />
-              <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 outline-none" placeholder="******" />
-            </div>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700">Confirmar Senha</label>
-            <div className="relative mt-1">
-              <Lock className="absolute left-3 top-3 text-gray-400" size={18} />
-              <input type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 outline-none" placeholder="******" />
-            </div>
-          </div>
-          <button type="submit" disabled={loading} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 rounded-lg transition flex justify-center">
-            {loading ? <Loader2 className="animate-spin" /> : "Salvar e Entrar"}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
+  if (!user) return <div className="text-center text-sm text-slate-500">Preparando seu acesso...</div>;
+  return <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8"><span className="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-amber-50 text-amber-600"><LockKeyhole size={23} /></span><p className="text-xs font-bold uppercase tracking-wider text-amber-600">Primeiro acesso</p><h2 className="mt-2 text-3xl font-bold text-slate-900">Olá, {user.name.split(" ")[0]}</h2><p className="mt-2 text-sm leading-6 text-slate-500">Antes de continuar, troque a senha temporária por uma senha pessoal e segura.</p>
+    {message && <div className="mt-5 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{message}</div>}
+    <form onSubmit={submit} className="mt-6 space-y-4"><label className="block text-sm font-semibold text-slate-700">Nova senha<input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-teal-500" /></label><label className="block text-sm font-semibold text-slate-700">Confirme a senha<input type="password" required value={confirm} onChange={e => setConfirm(e.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-teal-500" /></label><button disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 py-3.5 text-sm font-bold text-white hover:bg-teal-700 disabled:opacity-60">{loading ? <Loader2 className="animate-spin" size={19} /> : <><CheckCircle2 size={18} />Salvar e entrar</>}</button></form>
+  </div>;
 }

@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
 // DELETE: Excluir agendamento
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = parseInt(params.id);
+    const id = parseInt((await params).id);
     await prisma.appointment.delete({ where: { id } });
     return NextResponse.json({ success: true });
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -14,9 +14,9 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 }
 
 // PUT: Atualizar agendamento
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = parseInt(params.id);
+    const id = parseInt((await params).id);
     const body = await request.json();
 
     const updated = await prisma.appointment.update({

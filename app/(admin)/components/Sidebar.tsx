@@ -1,242 +1,69 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  Calendar,
-  Users,
-  ShoppingBag,
-  MessageCircle,
-  DollarSign,
-  Package,
-  FileEdit,
-  Building2,
-  BarChart3,
-  FileText,
-  HelpCircle,
-  Settings,
-  ShieldCheck,
-  Activity,
-  ChevronDown,
-  ClipboardList,
-  Pill,
-  FileSignature,
-  FileBadge,
-  Send,
-  Bell,
+  Activity, BarChart3, Building2, CalendarDays, ChevronRight, ClipboardList,
+  FileBadge, FileSignature, HelpCircle, LayoutDashboard, MessageSquareText,
+  Package, Pill, ReceiptText, Settings, ShieldCheck, ShoppingBag, Users, WalletCards, X
 } from "lucide-react";
 
-export default function Sidebar() {
-  // ==========================================
-  // 1. TODOS OS HOOKS PRIMEIRO (Sempre no topo!)
-  // ==========================================
+const groups = [
+  { label: "Operação", items: [
+    { href: "/dashboard", label: "Visão geral", icon: LayoutDashboard },
+    { href: "/agenda", label: "Agenda", icon: CalendarDays },
+    { href: "/clientes", label: "Clientes", icon: Users },
+    { href: "/cadastros", label: "Cadastros", icon: ClipboardList },
+    { href: "/vendas", label: "Vendas", icon: ShoppingBag },
+  ]},
+  { label: "Atendimento", items: [
+    { href: "/atendimento/anamneses", label: "Anamneses", icon: ClipboardList },
+    { href: "/atendimento/receituarios", label: "Receituários", icon: Pill },
+    { href: "/atendimento/creditos", label: "Créditos de pacotes", icon: ShieldCheck },
+    { href: "/atendimento/termos", label: "Termos", icon: FileSignature },
+    { href: "/atendimento/atestados", label: "Atestados", icon: FileBadge },
+    { href: "/atendimento/lembretes", label: "Comunicação", icon: MessageSquareText },
+    { href: "/atendimento/sms", label: "Mensagens", icon: MessageSquareText },
+  ]},
+  { label: "Gestão", items: [
+    { href: "/financeiro", label: "Financeiro", icon: WalletCards },
+    { href: "/estoque", label: "Estoque", icon: Package },
+    { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
+    { href: "/fiscal", label: "Fiscal", icon: ReceiptText },
+    { href: "/minha-clinica", label: "Minha clínica", icon: Building2 },
+  ]},
+];
+
+export default function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
   const pathname = usePathname();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [user, setUser] = useState<any>(null);
-  const [mounted, setMounted] = useState(false);
-  
-  // AQUI: Deixei apenas o estado do Atendimento, já que removemos o de Vendas!
-  const [isAtendimentoOpen, setIsAtendimentoOpen] = useState(false);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
-    const stored = localStorage.getItem("user");
-    if (stored) setUser(JSON.parse(stored));
-  }, []);
-
-  // ==========================================
-  // 2. AGORA SIM AS CONDICIONAIS DE RETORNO
-  // ==========================================
-
-  // Esconde no login/cadastro
-  if (pathname === "/login" || pathname === "/cadastro") return null;
-
-  // Evita erro de hidratação
-  if (!mounted) return null;
-
-  // ==========================================
-  // 3. Funções auxiliares e Renderização
-  // ==========================================
-  const isActive = (path: string) => pathname === path;
-
-  const linkClass = (path: string) => `
-    flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-lg transition-all mb-1
-    ${
-      isActive(path)
-        ? "text-teal-600 bg-teal-50"
-        : "text-gray-600 hover:text-teal-600 hover:bg-gray-50"
-    }
-  `;
-
-  return (
-    <aside className="w-64 bg-white h-screen border-r border-gray-200 flex flex-col fixed left-0 top-0 z-50 font-sans">
-      {/* LOGO */}
-      <div className="h-16 flex items-center px-6 border-b border-gray-100">
-        <div className="flex items-center gap-2 text-teal-600">
-          <Activity size={28} strokeWidth={2.5} />
-          <span className="text-xl font-bold tracking-tight text-gray-800">
-            Clinica <span className="text-teal-600">Sys</span>
-          </span>
-        </div>
+  return <>
+    {mobileOpen && <button aria-label="Fechar menu" onClick={onClose} className="fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-sm lg:hidden" />}
+    <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-slate-200 bg-white transition-transform duration-200 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <div className="flex h-[72px] items-center justify-between border-b border-slate-100 px-5">
+        <Link href="/dashboard" onClick={onClose} className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-teal-600 text-white shadow-lg shadow-teal-600/20"><Activity size={23} /></span>
+          <span><strong className="block text-base tracking-tight text-slate-900">Clínica Sys</strong><small className="text-xs text-slate-400">Gestão inteligente</small></span>
+        </Link>
+        <button onClick={onClose} aria-label="Fechar menu" className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 lg:hidden"><X size={20} /></button>
       </div>
-
-      {/* MENU */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto custom-scrollbar">
-        <Link href="/dashboard" className={linkClass("/dashboard")}>
-          <LayoutDashboard size={18} /> Início
-        </Link>
-
-        <Link href="/agenda" className={linkClass("/agenda")}>
-          <Calendar size={18} /> Agenda
-        </Link>
-
-        <Link href="/clientes" className={linkClass("/clientes")}>
-          <Users size={18} /> Clientes
-        </Link>
-
-        {/* MENU: VENDAS E ORÇAMENTOS */}
-        <Link href="/vendas" className={linkClass("/vendas")}>
-          <ShoppingBag size={18} /> Vendas e Orçamentos
-        </Link>
-
-        {/* MENU: ATENDIMENTO */}
-        <div className="flex flex-col">
-          <div
-            onClick={() => setIsAtendimentoOpen(!isAtendimentoOpen)}
-            className={`${linkClass("#")} justify-between cursor-pointer`}
-          >
-            <div className="flex items-center gap-3">
-              <MessageCircle size={18} />
-              Atendimento
-            </div>
-            <ChevronDown
-              size={14}
-              className={`text-gray-400 transition-transform duration-200 ${isAtendimentoOpen ? "rotate-180" : ""}`}
-            />
-          </div>
-
-          {isAtendimentoOpen && (
-            <div className="flex flex-col gap-1 mt-1 ml-6 pl-4 border-l-2 border-gray-100 mb-2">
-
-              <Link
-                href="/atendimento/anamneses"
-                className="flex items-center gap-3 py-2 text-sm text-gray-600 hover:text-[#00acc1] hover:bg-teal-50/50 rounded-md px-2 transition-colors"
-              >
-                <ClipboardList size={16} /> Anamneses
-              </Link>
-
-              <Link
-                href="/atendimento/receituarios"
-                className="flex items-center gap-3 py-2 text-sm text-gray-600 hover:text-[#00acc1] hover:bg-teal-50/50 rounded-md px-2 transition-colors"
-              >
-                <Pill size={16} /> Receituários
-              </Link>
-
-              <Link
-                href="/atendimento/creditos"
-                className="flex items-center gap-3 py-2 text-sm text-gray-600 hover:text-[#00acc1] hover:bg-teal-50/50 rounded-md px-2 transition-colors"
-              >
-                <Package size={16} /> Créditos de Pacotes
-              </Link>
-
-              <Link
-                href="/atendimento/termos"
-                className="flex items-center gap-3 py-2 text-sm text-gray-600 hover:text-[#00acc1] hover:bg-teal-50/50 rounded-md px-2 transition-colors"
-              >
-                <FileSignature size={16} /> Termos de Consentimento
-              </Link>
-
-              <Link
-                href="/atendimento/atestados"
-                className="flex items-center gap-3 py-2 text-sm text-gray-600 hover:text-[#00acc1] hover:bg-teal-50/50 rounded-md px-2 transition-colors"
-              >
-                <FileBadge size={16} /> Atestados
-              </Link>
-
-              <Link
-                href="/atendimento/sms"
-                className="flex items-center gap-3 py-2 text-sm text-gray-600 hover:text-[#00acc1] hover:bg-teal-50/50 rounded-md px-2 transition-colors"
-              >
-                <Send size={16} /> Envio de SMSs
-              </Link>
-
-              <Link
-                href="/atendimento/lembretes"
-                className="flex items-center gap-3 py-2 text-sm text-gray-600 hover:text-[#00acc1] hover:bg-teal-50/50 rounded-md px-2 transition-colors"
-              >
-                <Bell size={16} /> Lembretes
-              </Link>
-            </div>
-          )}
-        </div>
-
-        <Link href="/financeiro" className={linkClass("/financeiro")}>
-          <div className="flex items-center gap-3">
-            <DollarSign size={18} /> Financeiro
-          </div>
-        </Link>
-
-        <div className={linkClass("#") + " justify-between cursor-pointer"}>
-          <div className="flex items-center gap-3">
-            <Package size={18} /> Estoque
-          </div>
-          <ChevronDown size={14} className="text-gray-400" />
-        </div>
-
-        <div className={linkClass("#") + " justify-between cursor-pointer"}>
-          <div className="flex items-center gap-3">
-            <FileEdit size={18} /> Cadastros
-          </div>
-          <ChevronDown size={14} className="text-gray-400" />
-        </div>
-
-        <div className={linkClass("#") + " justify-between cursor-pointer"}>
-          <div className="flex items-center gap-3">
-            <Building2 size={18} /> Minha Clínica
-          </div>
-          <ChevronDown size={14} className="text-gray-400" />
-        </div>
-
-        <div className={linkClass("#") + " justify-between cursor-pointer"}>
-          <div className="flex items-center gap-3">
-            <BarChart3 size={18} /> Relatórios
-          </div>
-          <ChevronDown size={14} className="text-gray-400" />
-        </div>
-
-        <Link href="/fiscal" className={linkClass("/fiscal")}>
-          <FileText size={18} /> Fiscal
-        </Link>
-
-        {/* ÁREA DO ADMIN */}
-        {user?.userType === "admin" && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
-              Administração
-            </p>
-
-            <Link href="/admin/users" className={linkClass("/admin/users")}>
-              <ShieldCheck size={18} /> Aprovações
-            </Link>
-
-            <Link href="/configuracoes" className={linkClass("/configuracoes")}>
-              <Settings size={18} /> Configurações
-            </Link>
-          </div>
-        )}
-
-        <div className="mt-2">
-          <Link
-            href="/ajuda"
-            className="flex items-center gap-3 px-4 py-2 text-sm font-medium text-pink-500 hover:bg-pink-50 rounded-lg"
-          >
-            <HelpCircle size={18} /> Ajuda
-          </Link>
-        </div>
+      <nav className="custom-scrollbar flex-1 overflow-y-auto px-3 py-4">
+        {groups.map(group => <div key={group.label} className="mb-5">
+          <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">{group.label}</p>
+          <div className="space-y-1">{group.items.map(item => {
+            const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
+            const Icon = item.icon;
+            return <Link key={item.href} href={item.href} onClick={onClose} className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${active ? "bg-teal-50 text-teal-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
+              <Icon size={18} className={active ? "text-teal-600" : "text-slate-400 group-hover:text-teal-600"} />
+              <span className="flex-1">{item.label}</span>{active && <ChevronRight size={15} />}
+            </Link>;
+          })}</div>
+        </div>)}
       </nav>
+      <div className="border-t border-slate-100 p-3">
+        <Link href="/usuarios/pendentes" onClick={onClose} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"><ShieldCheck size={18} className="text-slate-400" />Usuários</Link>
+        <Link href="/configuracoes" onClick={onClose} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"><Settings size={18} className="text-slate-400" />Configurações</Link>
+        <Link href="/ajuda" onClick={onClose} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"><HelpCircle size={18} className="text-slate-400" />Ajuda</Link>
+      </div>
     </aside>
-  );
+  </>;
 }

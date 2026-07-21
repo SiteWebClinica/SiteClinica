@@ -1,82 +1,37 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
 import nodemailer from "nodemailer";
-import crypto from "crypto"; // Já vem no Node.js, serve para gerar códigos aleatórios
+import crypto from "crypto";
+import { prisma } from "@/app/lib/prisma";
 
-const prisma = new PrismaClient({
-  datasourceUrl: process.env.DATABASE_URL,
-});
+const genericMessage = "Se o e-mail estiver cadastrado e aprovado, enviaremos as instruções.";
 
 export async function POST(request: Request) {
   try {
-    const { email } = await request.json();
+    const body = await request.json();
+    const email = String(body.email || "").trim().toLowerCase();
+    if (!email) return NextResponse.json({ error: "Informe um e-mail válido." }, { status: 400 });
 
-    // 1. Busca o usuário
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || user.status !== "APPROVED" || !user.active) return NextResponse.json({ message: genericMessage });
 
-    if (!user) {
-      // Por segurança, não dizemos se o email existe ou não, mas aqui vamos retornar erro pra facilitar seus testes
-      return NextResponse.json({ error: "E-mail não encontrado no sistema." }, { status: 404 });
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    await prisma.user.update({ where: { id: user.id }, data: { resetToken: tokenHash, resetTokenExpiry: new Date(Date.now() + 60 * 60 * 1000) } });
+
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.warn("Recuperação solicitada, mas o serviço de e-mail não está configurado.");
+      return NextResponse.json({ message: genericMessage });
     }
 
-    // 2. A REGRA DE OURO (Anti-Burlar) 🔒
-    if (user.status === "PENDING") {
-      return NextResponse.json(
-        { error: "Seu cadastro não foi aprovado ainda, logo não será possível redefinir a senha." },
-        { status: 403 }
-      );
-    }
-
-    // 3. Gera o Token (Código Único) e Validade (1 hora)
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hora a partir de agora
-
-    // 4. Salva no banco
-    await prisma.user.update({
-      where: { email },
-      data: {
-        resetToken,
-        resetTokenExpiry,
-      },
-    });
-
-    // 5. Configura o envio de e-mail (seu Gmail)
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    // Link usando seu IP (troque pelo seu IP se mudou, ou use localhost se for testar no PC)
-    // Se seu IP for 192.168.1.8:
-    const resetLink = `http://192.168.1.8:3000/redefinir-senha?token=${resetToken}`;
-
-    // 6. Envia o e-mail
+    const resetLink = `${new URL(request.url).origin}/redefinir-senha?token=${rawToken}`;
+    const transporter = nodemailer.createTransport({ service: "gmail", auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS } });
     await transporter.sendMail({
-      from: `"Sistema Clínica" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Recuperação de Senha",
-      html: `
-        <div style="font-family: Arial, sans-serif; color: #333;">
-          <h2>Recuperação de Senha</h2>
-          <p>Você solicitou a redefinição de sua senha.</p>
-          <p>Clique no botão abaixo para criar uma nova senha:</p>
-          <br/>
-          <a href="${resetLink}" style="background: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Redefinir Minha Senha</a>
-          <br/><br/>
-          <p style="font-size: 12px; color: #666;">Este link expira em 1 hora.</p>
-        </div>
-      `,
+      from: `"Clínica Sys" <${process.env.EMAIL_USER}>`, to: user.email, subject: "Redefinição de senha — Clínica Sys",
+      html: `<div style="font-family:Arial,sans-serif;color:#334155;max-width:560px;margin:auto"><h2 style="color:#0f766e">Redefinição de senha</h2><p>Olá, ${user.name}.</p><p>Recebemos uma solicitação para alterar sua senha. O link abaixo é válido por uma hora.</p><p style="margin:28px 0"><a href="${resetLink}" style="background:#0f766e;color:white;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">Criar nova senha</a></p><p style="font-size:12px;color:#94a3b8">Se você não solicitou esta alteração, ignore este e-mail.</p></div>`,
     });
-
-    return NextResponse.json({ message: "E-mail de recuperação enviado!" });
-
+    return NextResponse.json({ message: genericMessage });
   } catch (error) {
-    console.error("Erro ao recuperar senha:", error);
-    return NextResponse.json({ error: "Erro interno." }, { status: 500 });
+    console.error("Erro na recuperação de senha:", error);
+    return NextResponse.json({ error: "Não foi possível processar a solicitação." }, { status: 500 });
   }
 }

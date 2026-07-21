@@ -2,84 +2,28 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Mail, ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Mail } from "lucide-react";
 
-export default function RecuperarSenhaPage() {
+export default function RecuperarPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setMessage(null);
-
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); setLoading(true); setMessage(null);
     try {
-      const res = await fetch("/api/auth/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
+      const res = await fetch("/api/auth/forgot-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Erro ao solicitar recuperação.");
-      }
-
-      setMessage({ type: "success", text: "Verifique seu e-mail para redefinir a senha!" });
-    } catch (error: any) {
-      setMessage({ type: "error", text: error.message });
-    } finally {
-      setLoading(false);
-    }
+      if (!res.ok) throw new Error(data.error || "Não foi possível enviar o link.");
+      setMessage({ ok: true, text: "Se este e-mail estiver cadastrado e aprovado, enviaremos as instruções de recuperação." });
+    } catch (err) { setMessage({ ok: false, text: err instanceof Error ? err.message : "Erro de conexão." }); }
+    finally { setLoading(false); }
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">Recuperar Senha</h1>
-          <p className="text-gray-500 text-sm mt-1">Informe seu e-mail para receber o link.</p>
-        </div>
-
-        {message && (
-          <div className={`p-4 mb-4 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-            {message.text}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-3 text-gray-400" size={20} />
-              <input
-                type="email"
-                required
-                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition flex items-center justify-center gap-2"
-          >
-            {loading ? <Loader2 className="animate-spin" /> : "Enviar Link"}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center">
-          <Link href="/login" className="text-sm text-gray-600 hover:text-blue-600 flex items-center justify-center gap-1">
-            <ArrowLeft size={16} /> Voltar para o Login
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">
+    <span className="mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-teal-50 text-teal-600"><Mail size={23} /></span><p className="mb-2 text-xs font-bold uppercase tracking-[.16em] text-teal-600">Recuperação de acesso</p><h2 className="text-3xl font-bold text-slate-900">Esqueceu a senha?</h2><p className="mt-2 text-sm leading-6 text-slate-500">Informe o e-mail utilizado no cadastro e enviaremos um link seguro.</p>
+    {message && <div className={`mt-5 flex gap-2 rounded-xl p-3 text-sm ${message.ok ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>{message.ok && <CheckCircle2 size={18} className="shrink-0" />}{message.text}</div>}
+    <form onSubmit={submit} className="mt-6 space-y-4"><label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">E-mail</span><input required type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="nome@clinica.com" className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10" /></label><button disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-3.5 text-sm font-bold text-white hover:bg-teal-700 disabled:opacity-60">{loading ? <Loader2 className="animate-spin" size={19} /> : "Enviar link de recuperação"}</button></form>
+    <Link href="/login" className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-slate-500 hover:text-teal-600"><ArrowLeft size={16} />Voltar ao login</Link>
+  </div>;
 }

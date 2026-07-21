@@ -3,10 +3,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
 // GET /api/sales/[id]
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const sale = await prisma.sale.findUnique({
-      where: { id: Number(params.id) },
+      where: { id: Number(id) },
       include: { items: true, payments: true },
     });
     if (!sale) return NextResponse.json({ error: "Não encontrado" }, { status: 404 });
@@ -17,10 +18,10 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 }
 
 // PUT /api/sales/[id] - Atualiza status ou dados da venda
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const body = await request.json();
-    const id = Number(params.id);
+    const id = Number((await params).id);
 
     // Remove itens e pagamentos antigos e recria (replace)
     await prisma.saleItem.deleteMany({ where: { saleId: id } });
@@ -75,9 +76,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 }
 
 // DELETE /api/sales/[id]
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await prisma.sale.delete({ where: { id: Number(params.id) } });
+    await prisma.sale.delete({ where: { id: Number((await params).id) } });
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: "Erro ao excluir" }, { status: 500 });

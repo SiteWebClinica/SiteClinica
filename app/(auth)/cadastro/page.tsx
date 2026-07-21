@@ -1,79 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import { Send, User, Mail, CheckCircle } from "lucide-react";
 import Link from "next/link";
+import { ArrowLeft, CheckCircle2, Loader2, Mail, Send, UserRound } from "lucide-react";
 
-export default function PublicRegisterPage() {
-  const [formData, setFormData] = useState({ name: "", email: "" });
-  const [success, setSuccess] = useState(false);
+export default function CadastroPage() {
+  const [form, setForm] = useState({ name: "", email: "" });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-
+  async function submit(e: React.FormEvent) {
+    e.preventDefault(); setLoading(true); setError("");
     try {
-        const res = await fetch("/api/auth/cadastro", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(formData)
-        });
-
-        if (res.ok) setSuccess(true);
-        else alert("Erro ao solicitar. Email já cadastrado?");
-    } catch (err) {
-        alert("Erro de conexão.");
-    } finally {
-        setLoading(false);
-    }
+      const res = await fetch("/api/auth/cadastro", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Não foi possível enviar a solicitação.");
+      setSuccess(true);
+    } catch (err) { setError(err instanceof Error ? err.message : "Erro de conexão."); }
+    finally { setLoading(false); }
   }
 
-  if (success) {
-    return (
-        <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-            <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
-                <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle size={32} />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Solicitação Enviada!</h2>
-                <p className="text-gray-600 mb-6">
-                    O administrador irá analisar seu cadastro. Assim que aprovado, você receberá sua senha de acesso no email: <strong>{formData.email}</strong>.
-                </p>
-                <Link href="/login" className="text-teal-600 font-bold hover:underline">Voltar ao Login</Link>
-            </div>
-        </div>
-    );
-  }
+  if (success) return <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl shadow-slate-900/5"><span className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-2xl bg-emerald-50 text-emerald-600"><CheckCircle2 size={32} /></span><p className="text-xs font-bold uppercase tracking-wider text-emerald-600">Solicitação enviada</p><h2 className="mt-2 text-2xl font-bold text-slate-900">Agora é com a gente</h2><p className="mt-3 text-sm leading-6 text-slate-500">A administração analisará o cadastro de <strong className="text-slate-700">{form.email}</strong>. Você receberá as orientações de acesso por e-mail.</p><Link href="/login" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-teal-600 px-5 py-3 text-sm font-bold text-white hover:bg-teal-700"><ArrowLeft size={17} />Voltar ao login</Link></div>;
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-600 to-cyan-700 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="p-8">
-            <div className="text-center mb-8">
-                <h1 className="text-2xl font-bold text-gray-800">Solicitar Acesso</h1>
-                <p className="text-gray-500 text-sm">Preencha seus dados para análise</p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="relative">
-                    <User className="absolute left-3 top-3 text-gray-400" size={20} />
-                    <input type="text" placeholder="Seu Nome Completo" required className="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:border-teal-500 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                </div>
-                <div className="relative">
-                    <Mail className="absolute left-3 top-3 text-gray-400" size={20} />
-                    <input type="email" placeholder="Seu E-mail Corporativo" required className="w-full pl-10 p-3 border border-gray-300 rounded-lg focus:border-teal-500 outline-none" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-                </div>
-
-                <button disabled={loading} className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2">
-                    {loading ? "Enviando..." : <><Send size={18} /> Enviar Solicitação</>}
-                </button>
-            </form>
-        </div>
-        <div className="bg-gray-50 p-4 text-center border-t border-gray-100">
-            <Link href="/login" className="text-sm text-gray-600 hover:text-teal-600">Já tem acesso? Faça login</Link>
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/5 sm:p-8">
+    <p className="mb-2 text-xs font-bold uppercase tracking-[.16em] text-teal-600">Novo acesso</p><h2 className="text-3xl font-bold text-slate-900">Solicite seu cadastro</h2><p className="mt-2 text-sm leading-6 text-slate-500">Preencha seus dados profissionais. A administração da clínica aprovará o acesso.</p>
+    {error && <div className="mt-5 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</div>}
+    <form onSubmit={submit} className="mt-6 space-y-4">
+      <label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">Nome completo</span><span className="relative block"><UserRound className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input required minLength={3} autoComplete="name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Como devemos chamar você?" className="w-full rounded-xl border border-slate-200 px-11 py-3 text-sm outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10" /></span></label>
+      <label className="block"><span className="mb-1.5 block text-sm font-semibold text-slate-700">E-mail profissional</span><span className="relative block"><Mail className="absolute left-3.5 top-3.5 text-slate-400" size={18} /><input required type="email" autoComplete="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="nome@clinica.com" className="w-full rounded-xl border border-slate-200 px-11 py-3 text-sm outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10" /></span></label>
+      <button disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-3.5 text-sm font-bold text-white hover:bg-teal-700 disabled:opacity-60">{loading ? <Loader2 className="animate-spin" size={19} /> : <><Send size={18} />Enviar solicitação</>}</button>
+    </form>
+    <Link href="/login" className="mt-6 flex items-center justify-center gap-2 text-sm font-medium text-slate-500 hover:text-teal-600"><ArrowLeft size={16} />Já tenho acesso</Link>
+  </div>;
 }

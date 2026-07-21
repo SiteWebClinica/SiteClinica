@@ -5,11 +5,11 @@ import { hash } from "bcryptjs";
 // POST /api/users/[id]/approve
 export async function POST(
     request: Request, 
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 1. Pega o ID da URL e converte para número
-    const id = parseInt(params.id);
+    const id = parseInt((await params).id);
     
     // 2. Pega os dados que vieram do Frontend
     const body = await request.json();
@@ -26,14 +26,12 @@ export async function POST(
             active: true,           // Ativa a conta
             password: hashedPassword, // Atualiza a senha provisória
             userType: userType,     // Define se é admin, comum ou profissional
-            role: userType === 'admin' ? 'ADMIN' : 'USER' // Atualiza o role técnico também
+            role: userType === 'admin' ? 'ADMIN' : 'USER',
+            mustChangePassword: true,
         }
     });
 
-    // 5. (Simulação) Aqui você enviaria o email de verdade usando uma lib como 'nodemailer' ou 'Resend'
-    console.log(`📧 Enviando email para ${updatedUser.email} com a senha: ${password}`);
-
-    return NextResponse.json({ success: true, user: updatedUser });
+    return NextResponse.json({ success: true, user: { id: updatedUser.id, name: updatedUser.name, email: updatedUser.email, status: updatedUser.status, userType: updatedUser.userType } });
 
   } catch (error) {
     console.error("Erro na aprovação:", error);

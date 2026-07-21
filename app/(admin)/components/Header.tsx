@@ -1,113 +1,53 @@
-// app/(admin)/components/Header.tsx  — VERSÃO CORRIGIDA
-// Mudança: logout chama POST /api/auth/logout (apaga cookie) e também limpa localStorage
 "use client";
 
-import { Search, Bell, Send, Moon, LogOut, ChevronDown, User } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Menu, Search, UserRound } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-export default function Header() {
+type StoredUser = { name?: string; email?: string; userType?: string };
+const titles: Record<string, string> = { dashboard: "Visão geral", agenda: "Agenda", clientes: "Clientes", vendas: "Vendas e orçamentos", financeiro: "Financeiro", estoque: "Estoque", relatorios: "Relatórios", fiscal: "Fiscal", configuracoes: "Configurações", ajuda: "Central de ajuda" };
+
+export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-
-  const [user, setUser] = useState<any>(null);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [user, setUser] = useState<StoredUser>({});
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("user");
-    if (stored) setUser(JSON.parse(stored));
+    const frame = requestAnimationFrame(() => {
+      if (stored) try { setUser(JSON.parse(stored) as StoredUser); } catch { setUser({}); }
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
 
-  // CORRIGIDO: chama a API de logout para apagar o cookie httpOnly
-  async function handleLogout() {
-    if (confirm("Deseja realmente sair do sistema?")) {
-      try {
-        await fetch("/api/auth/logout", { method: "POST" });
-      } catch {
-        // Mesmo se falhar, limpa o localStorage e redireciona
-      }
-      localStorage.removeItem("user");
-      router.push("/login");
+  const segment = pathname.split("/").filter(Boolean)[0] || "dashboard";
+  const title = titles[segment] || segment.replaceAll("-", " ");
+
+  async function logout() {
+    try { await fetch("/api/logout", { method: "POST" }); } finally {
+      localStorage.removeItem("user"); router.replace("/login");
     }
   }
 
-  if (pathname === "/login" || pathname === "/cadastro") return null;
-
-  return (
-    <header className="fixed top-0 left-64 right-0 h-16 bg-white border-b border-gray-100 flex items-center justify-between px-8 z-40">
-
-      {/* BARRA DE PESQUISA */}
-      <div className="flex items-center flex-1 max-w-xl">
-        <div className="relative w-full flex">
-          <input
-            type="text"
-            placeholder="Busque por nomes ou dados..."
-            className="w-full pl-4 pr-12 py-2 border border-gray-200 rounded-l-lg focus:outline-none focus:border-teal-500 text-sm text-gray-600 bg-gray-50/50"
-          />
-          <button className="bg-teal-500 hover:bg-teal-600 text-white px-4 rounded-r-lg flex items-center justify-center transition-colors">
-            <Search size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* ÍCONES DA DIREITA */}
-      <div className="flex items-center gap-5">
-        <div className="flex items-center gap-4 text-gray-400">
-          <button className="hover:text-teal-600"><Moon size={20} /></button>
-          <button className="hover:text-teal-600"><Send size={20} /></button>
-          <button className="hover:text-teal-600 relative">
-            <Bell size={20} />
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
-        </div>
-
-        <div className="h-8 w-px bg-gray-200"></div>
-
-        {/* PERFIL COM DROPDOWN */}
-        <div className="relative">
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-all"
-          >
-            <div className="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-sm">
-              {user?.name?.charAt(0) || <User size={16} />}
-            </div>
-            <div className="hidden md:block text-right">
-              <p className="text-sm font-bold text-gray-700 leading-none">
-                {user?.name?.split(" ")[0] || "Usuário"}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                {user?.email || "email@clinica.com"}
-              </p>
-            </div>
-            <ChevronDown
-              size={14}
-              className={`text-gray-400 transition-transform ${isMenuOpen ? "rotate-180" : ""}`}
-            />
-          </button>
-
-          {isMenuOpen && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)}></div>
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50">
-                <div className="p-4 border-b border-gray-50 bg-gray-50">
-                  <p className="text-xs font-bold text-gray-500">Logado como</p>
-                  <p className="text-xs text-gray-800 truncate font-medium">{user?.email}</p>
-                </div>
-                <button className="w-full text-left px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2 transition-colors">
-                  <User size={16} /> Meu Perfil
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 font-bold transition-colors border-t border-gray-50"
-                >
-                  <LogOut size={16} /> Sair do Sistema
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </header>
-  );
+  return <header className="sticky top-0 z-30 flex h-[72px] items-center gap-3 border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur sm:px-6 lg:px-8">
+    <button onClick={onMenuClick} aria-label="Abrir menu" className="rounded-xl p-2.5 text-slate-600 hover:bg-slate-100 lg:hidden"><Menu size={22} /></button>
+    <div className="min-w-0"><p className="text-[11px] font-semibold uppercase tracking-wider text-teal-600">Clínica Sys</p><h1 className="truncate text-lg font-bold capitalize text-slate-900">{title}</h1></div>
+    <div className="ml-auto hidden w-full max-w-sm items-center md:flex">
+      <Search className="pointer-events-none relative left-9 text-slate-400" size={17} />
+      <input aria-label="Busca global" placeholder="Buscar cliente, agenda ou venda..." className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-11 pr-4 text-sm outline-none focus:border-teal-500 focus:bg-white" />
+    </div>
+    <button aria-label="Notificações" className="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-100"><Bell size={20} /><span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" /></button>
+    <div className="relative">
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-2 rounded-xl p-1.5 pr-2 hover:bg-slate-100">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-teal-600 text-sm font-bold text-white">{user.name?.charAt(0).toUpperCase() || <UserRound size={17} />}</span>
+        <span className="hidden text-left xl:block"><strong className="block max-w-32 truncate text-xs text-slate-800">{user.name || "Usuário"}</strong><small className="block text-[10px] capitalize text-slate-400">{user.userType || "Equipe"}</small></span>
+        <ChevronDown size={15} className="hidden text-slate-400 sm:block" />
+      </button>
+      {open && <><button aria-label="Fechar menu do usuário" onClick={() => setOpen(false)} className="fixed inset-0 z-40" /><div className="absolute right-0 z-50 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10">
+        <div className="border-b border-slate-100 px-3 py-3"><p className="truncate text-sm font-semibold text-slate-800">{user.name || "Usuário"}</p><p className="truncate text-xs text-slate-400">{user.email}</p></div>
+        <button onClick={logout} className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50"><LogOut size={17} />Sair do sistema</button>
+      </div></>}
+    </div>
+  </header>;
 }
