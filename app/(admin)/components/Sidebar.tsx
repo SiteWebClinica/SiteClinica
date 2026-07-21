@@ -37,8 +37,7 @@ export default function Sidebar() {
   const [user, setUser] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
   
-  // AQUI: Declarei os estados dos submenus logo no início!
-  const [isVendasOpen, setIsVendasOpen] = useState(false);
+  // AQUI: Deixei apenas o estado do Atendimento, já que removemos o de Vendas!
   const [isAtendimentoOpen, setIsAtendimentoOpen] = useState(false);
 
   useEffect(() => {
@@ -55,7 +54,7 @@ export default function Sidebar() {
   // Esconde no login/cadastro
   if (pathname === "/login" || pathname === "/cadastro") return null;
 
-  // Evita erro de hidratação (opcional, mas bom manter)
+  // Evita erro de hidratação
   if (!mounted) return null;
 
   // ==========================================
@@ -99,35 +98,9 @@ export default function Sidebar() {
         </Link>
 
         {/* MENU: VENDAS E ORÇAMENTOS */}
-        <div className="flex flex-col gap-1">
-          <button
-            onClick={() => setIsVendasOpen(!isVendasOpen)}
-            className={`w-full flex items-center justify-between cursor-pointer ${linkClass("/vendas").replace('mb-1', '')}`} // tirei o mb-1 base para gerenciar o espaço no submenu
-          >
-            <div className="flex items-center gap-3">
-              <ShoppingBag size={18} />
-              <span>Vendas e Orçamentos</span>
-            </div>
-            <ChevronDown 
-              size={14} 
-              className={`transition-transform duration-200 text-gray-400 ${isVendasOpen ? "rotate-180" : ""}`} 
-            />
-          </button>
-
-          {isVendasOpen && (
-            <div className="flex flex-col gap-1 ml-6 mt-1 border-l-2 border-gray-100 pl-4 mb-2">
-              <Link href="/vendas/nova" className="flex items-center gap-3 py-2 text-sm text-gray-600 hover:text-[#00acc1] hover:bg-teal-50/50 rounded-md px-2 transition-colors">
-                Nova Venda
-              </Link>
-              <Link href="/vendas/orcamentos" className="flex items-center gap-3 py-2 text-sm text-gray-600 hover:text-[#00acc1] hover:bg-teal-50/50 rounded-md px-2 transition-colors">
-                Orçamentos
-              </Link>
-              <Link href="/vendas/historico" className="flex items-center gap-3 py-2 text-sm text-gray-600 hover:text-[#00acc1] hover:bg-teal-50/50 rounded-md px-2 transition-colors">
-                Histórico de Vendas
-              </Link>
-            </div>
-          )}
-        </div>
+        <Link href="/vendas" className={linkClass("/vendas")}>
+          <ShoppingBag size={18} /> Vendas e Orçamentos
+        </Link>
 
         {/* MENU: ATENDIMENTO */}
         <div className="flex flex-col">
@@ -245,7 +218,6 @@ export default function Sidebar() {
               Administração
             </p>
 
-            {/* Link corrigido para a tela de aprovação que criamos */}
             <Link href="/admin/users" className={linkClass("/admin/users")}>
               <ShieldCheck size={18} /> Aprovações
             </Link>

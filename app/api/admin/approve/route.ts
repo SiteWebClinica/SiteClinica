@@ -1,87 +1,72 @@
+// app/api/admin/approve/route.ts
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
-import nodemailer from "nodemailer"; // <--- Importamos o carteiro
+import { prisma } from "@/app/lib/prisma";
+import { hash } from "bcryptjs";
+import nodemailer from "nodemailer";
 
-const prisma = new PrismaClient({
-  datasourceUrl: process.env.DATABASE_URL,
-});
-
+// POST /api/admin/approve - Aprovação simples (UsuariosPage v1)
+// Body: { userId: number, newPassword: string }
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { userId, newPassword } = body;
+    const { userId, newPassword } = await request.json();
 
-    if (!userId || !newPassword) {
-      return NextResponse.json({ error: "Dados incompletos" }, { status: 400 });
+    if (!userId || !newPassword || newPassword.length < 6) {
+      return NextResponse.json(
+        { error: "userId e senha (mínimo 6 caracteres) são obrigatórios" },
+        { status: 400 }
+      );
     }
 
-    // 1. Busca os dados do usuário para saber o e-mail dele
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    });
+    const hashedPassword = await hash(newPassword, 10);
 
-    if (!user) {
-      return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
-    }
-
-    // 2. Criptografa a senha e atualiza no banco
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await prisma.user.update({
-      where: { id: userId },
+    const updatedUser = await prisma.user.update({
+      where: { id: Number(userId) },
       data: {
+        status: "APPROVED",
+        active: true,
         password: hashedPassword,
-        status: "ACTIVE",
-        mustChangePassword: true, // <--- ADICIONE ISSO (Obriga a trocar senha)
+        userType: "comum",
+        role: "USER",
       },
     });
 
-    // 3. Configura o envio do E-mail (O Carteiro)
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    // Envio de e-mail (opcional - funciona se EMAIL_USER e EMAIL_PASS estiverem no .env)
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
 
-    // 4. Dispara o E-mail Real
-    await transporter.sendMail({
-      from: `"Sistema Clínica" <${process.env.EMAIL_USER}>`,
-      to: user.email,
-      subject: "Acesso Aprovado - ClinicaSys",
-      html: `
-        <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #0070f3;">Olá, ${user.name}!</h2>
-          <p>Seu cadastro foi aprovado pelo administrador.</p>
-          <hr style="border: 1px solid #eee;" />
-          
-          <p><strong>Seus dados de acesso:</strong></p>
-          <p>E-mail: <strong>${user.email}</strong></p>
-          <p>Senha Temporária: <strong style="background: #eee; padding: 4px 8px; border-radius: 4px;">${newPassword}</strong></p>
-          
-          <hr style="border: 1px solid #eee;" />
-          <p style="font-size: 12px; color: #666;">Por segurança, troque sua senha no primeiro acesso.</p>
-          <br/>
-
-          <div style="text-align: center; margin: 20px 0;">
-            <a href="http://192.168.1.8:3000/login" target="_blank" style="background: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
-              Acessar Sistema
-            </a>
+      await transporter.sendMail({
+        from: `"Sistema Clínica" <${process.env.EMAIL_USER}>`,
+        to: updatedUser.email,
+        subject: "Seu acesso foi aprovado!",
+        html: `
+          <div style="font-family: Arial, sans-serif; color: #333; padding: 20px;">
+            <h2 style="color: #0d9488;">Acesso Liberado! ✅</h2>
+            <p>Olá <strong>${updatedUser.name}</strong>,</p>
+            <p>Seu acesso ao sistema foi aprovado. Use as credenciais abaixo para entrar:</p>
+            <div style="background: #f9fafb; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
+              <p><strong>Login:</strong> ${updatedUser.email}</p>
+              <p><strong>Senha:</strong> ${newPassword}</p>
+            </div>
+            <p style="color: #666; font-size: 12px; margin-top: 20px;">
+              Recomendamos que você altere sua senha após o primeiro acesso.
+            </p>
           </div>
+        `,
+      });
+    } catch (mailError) {
+      // E-mail falhou mas aprovação foi feita — não quebra o fluxo
+      console.warn("Aviso: e-mail não enviado:", mailError);
+    }
 
-          <p style="font-size: 12px; color: #888; text-align: center;">
-            Se o botão não funcionar, copie e cole o link abaixo no navegador:<br/>
-            <a href="http://192.168.1.8:3000/login" style="color: #0070f3;">http://192.168.1.8:3000/login</a>
-          </p>
-        </div>
-      `,
-    });
-
-    return NextResponse.json({ message: "Usuário aprovado e e-mail enviado!" });
-
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Erro ao aprovar:", error);
-    return NextResponse.json({ error: "Erro ao processar aprovação." }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao aprovar usuário" }, { status: 500 });
   }
 }

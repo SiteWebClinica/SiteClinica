@@ -4,96 +4,88 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")  
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  name         String
-  email        String   @unique
-  password     String   // Será preenchida temporariamente no cadastro, e atualizada pelo Admin
-  userType      String    @default("comum")
-  status       String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  active       Boolean  @default(false)
-  
-  // Role: "USER" (Comum), "ADMIN", "PROFESSIONAL"
-  role         String   @default("USER") 
-  
-  color        String?  @default("#0d9488")
+  id       Int     @id @default(autoincrement())
+  name     String
+  email    String  @unique
+  password String
+  userType String  @default("comum")
+  status   String  @default("PENDING")
+  active   Boolean @default(false)
+
+  role String @default("USER")
+
+  color        String? @default("#0d9488")
   serviceStart String?
   serviceEnd   String?
-  
-  permissions  Json?
-  notifications Json?
-  commissions  Json?
-  
-  createdAt    DateTime @default(now())
-}
 
-// prisma/schema.prisma
+  permissions   Json?
+  notifications Json?
+  commissions   Json?
+
+  createdAt DateTime @default(now())
+}
 
 model Appointment {
-  id           Int      @id @default(autoincrement())
-  title        String   // Nome do cliente
-  phone        String?
-  date         DateTime
-  startTime    String
-  endTime      String
-  
-  // --- NOVOS CAMPOS ADICIONADOS ---
-  procedure    String?  // Procedimento (Consulta, Avaliação...)
-  professional String?  // Profissional (Joao, Jessica...)
-  location     String?  // Sala Principal, Sala 02...
-  notify       String?  @default("nao_notificar") // email, sms...
-  repeat       Boolean  @default(false)
-  notes        String?  // Motivo da consulta
-  color        String?  @default("blue") // Cor do agendamento
-  type         String   @default("consultation")
+  id        Int      @id @default(autoincrement())
+  title     String
+  phone     String?
+  date      DateTime
+  startTime String
+  endTime   String
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  // Relação com Paciente (Opcional, se você já tiver)
-  patientId    Int?
-  patient      Patient? @relation(fields: [patientId], references: [id])
+  procedure    String?
+  professional String?
+  location     String?
+  notify       String? @default("nao_notificar")
+  repeat       Boolean @default(false)
+  notes        String?
+  color        String? @default("blue")
+  type         String  @default("consultation")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  patientId Int?
+  patient   Patient? @relation(fields: [patientId], references: [id])
 }
 
-// Atualize o model Patient existente
 model Patient {
-  id            Int       @id @default(autoincrement())
-  name          String
-  cpf           String?   @unique
-  rg            String?   // Novo
-  birthDate     DateTime? // Novo
-  age           String?   // Novo
-  instagram     String?   // Novo
-  profession    String?   // Novo
-  workplace     String?   // Novo
-  gender        String?   // Novo
-  civilStatus   String?   // Novo
-  referral      String?   // Indicação
-  notes         String?   // Observações
+  id          Int       @id @default(autoincrement())
+  name        String
+  cpf         String?   @unique
+  rg          String?
+  birthDate   DateTime?
+  age         String?
+  instagram   String?
+  profession  String?
+  workplace   String?
+  gender      String?
+  civilStatus String?
+  referral    String?
+  notes       String?
 
-  // Dados de Emergência / Saúde
   emergencyName  String?
   emergencyPhone String?
   healthPlan     String?
   bloodType      String?
 
-  // Relacionamentos
   contacts     Contact[]
   addresses    Address[]
   responsibles Responsible[]
-  appointments Appointment[] // Relacionamento com agendamentos
+  appointments Appointment[]
+  sales        Sale[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// Adicione estes models no final do arquivo (se não tiver)
 model Contact {
   id        Int     @id @default(autoincrement())
-  type      String  // "phone" ou "email"
+  type      String
   value     String
   patientId Int
   patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
@@ -114,24 +106,82 @@ model Responsible {
 }
 
 model Service {
-  id        Int      @id @default(autoincrement())
-  name      String
-  active    Boolean  @default(true)
+  id     Int     @id @default(autoincrement())
+  name   String
+  active Boolean @default(true)
 }
 
 model Location {
-  id        Int      @id @default(autoincrement())
-  name      String
-  active    Boolean  @default(true)
+  id     Int     @id @default(autoincrement())
+  name   String
+  active Boolean @default(true)
 }
 
 model Professional {
   id        Int     @id @default(autoincrement())
   name      String
-  specialty String? // Especialidade (Ex: Cardiologista)
-  register  String? // CRM, CRO, etc.
+  specialty String?
+  register  String?
   phone     String?
   email     String?
-  color     String  @default("blue") // Cor para o calendário
+  color     String  @default("blue")
   active    Boolean @default(true)
+}
+
+model Sale {
+  id   Int    @id @default(autoincrement())
+  code String @unique
+
+  clientName String
+  clientId   Int?
+  patient    Patient? @relation(fields: [clientId], references: [id])
+
+  professionalName String
+
+  saleDate DateTime @default(now())
+  status   String   @default("ORCAMENTO")
+
+  subtotal     Float  @default(0)
+  discountType String @default("R$")
+  discount     Float  @default(0)
+  total        Float  @default(0)
+
+  notes String?
+
+  items    SaleItem[]
+  payments SalePayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SaleItem {
+  id     Int  @id @default(autoincrement())
+  saleId Int
+  sale   Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  name           String
+  quantity       Float   @default(1)
+  unitPrice      Float   @default(0)
+  total          Float   @default(0)
+  generateCredit Boolean @default(false)
+}
+
+model SalePayment {
+  id     Int  @id @default(autoincrement())
+  saleId Int
+  sale   Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  method       String
+  amount       Float
+  installments Int     @default(1)
+  cardBrand    String?
+  acquirer     String?
+  bankAccount  String?
+
+  dueDate DateTime?
+  paidAt  DateTime?
+  status  String    @default("PENDENTE")
+
+  createdAt DateTime @default(now())
 }
